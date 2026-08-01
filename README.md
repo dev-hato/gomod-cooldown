@@ -15,7 +15,7 @@ It is not affiliated with, endorsed by, or sponsored by the Go project or Google
 ## Installation
 
 ```sh
-go install github.com/Goryudyuma/gomod-cooldown/cmd/gomod-cooldown@latest
+go install github.com/dev-hato/gomod-cooldown/cmd/gomod-cooldown@latest
 ```
 
 Or build the checked-out source with `go build ./cmd/gomod-cooldown`.

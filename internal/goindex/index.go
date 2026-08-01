@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Goryudyuma/gomod-cooldown/internal/availability"
+	"github.com/dev-hato/gomod-cooldown/internal/availability"
 )
 
 const pageLimit = 2000

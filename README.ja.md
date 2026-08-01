@@ -16,7 +16,7 @@ Go projectまたはGoogleと提携・承認・スポンサー関係はありま�
 ## インストール
 
 ```sh
-go install github.com/Goryudyuma/gomod-cooldown/cmd/gomod-cooldown@latest
+go install github.com/dev-hato/gomod-cooldown/cmd/gomod-cooldown@latest
 ```
 
 チェックアウトしたソースからは、`go build ./cmd/gomod-cooldown` でbuildできます。

@@ -16,9 +16,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Goryudyuma/gomod-cooldown/internal/availability"
-	"github.com/Goryudyuma/gomod-cooldown/internal/goindex"
-	"github.com/Goryudyuma/gomod-cooldown/internal/proxy"
+	"github.com/dev-hato/gomod-cooldown/internal/availability"
+	"github.com/dev-hato/gomod-cooldown/internal/goindex"
+	"github.com/dev-hato/gomod-cooldown/internal/proxy"
 )
 
 const timeSourceCommit = "commit"

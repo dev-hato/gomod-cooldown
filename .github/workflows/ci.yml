@@ -75,7 +75,7 @@ jobs:
           "${binary}" --version
           "${binary}" -- go version
           go version -m "${binary}" | tee build-info.txt
-          grep -F "github.com/Goryudyuma/gomod-cooldown/cmd/gomod-cooldown" build-info.txt
+          grep -F "github.com/dev-hato/gomod-cooldown/cmd/gomod-cooldown" build-info.txt
 
   vulnerability:
     name: govulncheck

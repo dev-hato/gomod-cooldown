@@ -1,4 +1,4 @@
-module github.com/Goryudyuma/gomod-cooldown
+module github.com/dev-hato/gomod-cooldown
 
 go 1.25.0
 

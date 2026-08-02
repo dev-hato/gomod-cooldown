@@ -28,7 +28,7 @@ jobs:
       actions: read
       contents: write
     env:
-      EXPECTED_MODULE: github.com/Goryudyuma/gomod-cooldown
+      EXPECTED_MODULE: github.com/dev-hato/gomod-cooldown
       GH_TOKEN: ${{ github.token }}
       RELEASE_TAG: ${{ inputs.tag }}
       TARGET_SHA: ${{ inputs.target_sha }}

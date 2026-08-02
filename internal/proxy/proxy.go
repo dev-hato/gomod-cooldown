@@ -15,7 +15,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Goryudyuma/gomod-cooldown/internal/availability"
+	"github.com/dev-hato/gomod-cooldown/internal/availability"
 	"golang.org/x/mod/modfile"
 	"golang.org/x/mod/module"
 	"golang.org/x/mod/semver"

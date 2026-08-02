@@ -13,7 +13,7 @@ provide the mutation protection without storing a signing key in Actions.
 
   ```sh
   gh api --method PUT \
-    repos/Goryudyuma/gomod-cooldown/environments/release \
+    repos/dev-hato/gomod-cooldown/environments/release \
     --input .github/environments/release.json
   ```
 
@@ -31,7 +31,7 @@ provide the mutation protection without storing a signing key in Actions.
 
   ```sh
   gh api --method POST \
-    repos/Goryudyuma/gomod-cooldown/rulesets \
+    repos/dev-hato/gomod-cooldown/rulesets \
     --input .github/rulesets/release-tags.json
   ```
 
@@ -79,7 +79,7 @@ version instead of resuming the old tag.
 From a clean environment, run:
 
 ```sh
-go install github.com/Goryudyuma/gomod-cooldown/cmd/gomod-cooldown@v1.0.0-rc.1
+go install github.com/dev-hato/gomod-cooldown/cmd/gomod-cooldown@v1.0.0-rc.1
 go version -m "$(go env GOPATH)/bin/gomod-cooldown"
 gomod-cooldown --help
 gomod-cooldown --version

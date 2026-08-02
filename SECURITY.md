@@ -16,7 +16,7 @@ Users of an older release should upgrade to receive a fix.
 ## Reporting a vulnerability
 
 Please report suspected vulnerabilities privately through the repository's
-[GitHub security advisory form](https://github.com/Goryudyuma/gomod-cooldown/security/advisories/new).
+[GitHub security advisory form](https://github.com/dev-hato/gomod-cooldown/security/advisories/new).
 Do not open a public issue or pull request containing vulnerability details
 until the maintainers have coordinated disclosure with you.
 

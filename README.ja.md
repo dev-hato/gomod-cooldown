@@ -20,7 +20,7 @@ Go projectまたはGoogleと提携・承認・スポンサー関係はありま�
 公開済みの最新stable releaseをinstallします。
 
 ```sh
-go install github.com/Goryudyuma/gomod-cooldown/cmd/gomod-cooldown@latest
+go install github.com/dev-hato/gomod-cooldown/cmd/gomod-cooldown@latest
 ```
 
 再現可能な環境にするには、`latest` を使いたい公開済みのexact versionに置き換えてください。
@@ -213,7 +213,7 @@ cross-platform build smoke testを実行します。リポジトリ内のPRで�
 ## 互換性
 
 v1の互換性contractには、flag名と意味、既定値、stdout/stderrの挙動、文書化したexit code、
-上記のplatform別signal handling、`github.com/Goryudyuma/gomod-cooldown` のinstall/module pathが
+上記のplatform別signal handling、`github.com/dev-hato/gomod-cooldown` のinstall/module pathが
 含まれます。filteringの挙動を文書化済みpolicyに戻す修正patchによって、個別versionの判定結果が
 変わることはあります。その変更は [CHANGELOG.md](CHANGELOG.md) に記録します。
 

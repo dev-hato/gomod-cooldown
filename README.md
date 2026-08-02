@@ -20,7 +20,7 @@ Go 1.25 or later is required to build or install `gomod-cooldown`.
 Install the latest published stable release:
 
 ```sh
-go install github.com/Goryudyuma/gomod-cooldown/cmd/gomod-cooldown@latest
+go install github.com/dev-hato/gomod-cooldown/cmd/gomod-cooldown@latest
 ```
 
 For a reproducible setup, replace `latest` with the exact published version you
@@ -235,7 +235,7 @@ a formatting pull request when safe changes are available.
 
 The v1 compatibility contract covers flag names and meanings, defaults,
 stdout/stderr behavior, documented exit codes, the platform-specific signal
-behavior documented above, and the `github.com/Goryudyuma/gomod-cooldown`
+behavior documented above, and the `github.com/dev-hato/gomod-cooldown`
 install/module path. A corrective patch that brings filtering behavior back
 into line with the documented policy may change an individual version
 decision; such changes are documented in [CHANGELOG.md](CHANGELOG.md).

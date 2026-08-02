@@ -14,7 +14,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Goryudyuma/gomod-cooldown/internal/availability"
+	"github.com/dev-hato/gomod-cooldown/internal/availability"
 )
 
 var now = time.Date(2026, 7, 11, 12, 0, 0, 0, time.UTC)

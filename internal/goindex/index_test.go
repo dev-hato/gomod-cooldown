@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Goryudyuma/gomod-cooldown/internal/availability"
+	"github.com/dev-hato/gomod-cooldown/internal/availability"
 )
 
 func TestSnapshotPagesDuplicatesAndBoundary(t *testing.T) {

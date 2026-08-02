@@ -29,6 +29,6 @@ project follows [Semantic Versioning](https://semver.org/).
 ## Earlier releases
 
 Release notes for v0.1.0 through v0.6.0 are available on the
-[GitHub Releases page](https://github.com/Goryudyuma/gomod-cooldown/releases).
+[GitHub Releases page](https://github.com/dev-hato/gomod-cooldown/releases).
 
-[Unreleased]: https://github.com/Goryudyuma/gomod-cooldown/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/dev-hato/gomod-cooldown/compare/v0.6.0...HEAD

@@ -1,18 +1,14 @@
 name: CI
-
 on:
   push:
     branches:
       - main
   pull_request:
-
 permissions:
   contents: read
-
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
-
 jobs:
   unit:
     name: unit (Go ${{ matrix.go-version }})
@@ -32,7 +28,6 @@ jobs:
       - run: go version
       - run: go test ./...
       - run: go vet ./...
-
   race:
     name: race
     runs-on: ubuntu-latest
@@ -43,7 +38,6 @@ jobs:
         with:
           go-version: stable
       - run: go test -race ./...
-
   platform:
     name: build/smoke (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
@@ -76,7 +70,6 @@ jobs:
           "${binary}" -- go version
           go version -m "${binary}" | tee build-info.txt
           grep -F "github.com/dev-hato/gomod-cooldown/cmd/gomod-cooldown" build-info.txt
-
   vulnerability:
     name: govulncheck
     runs-on: ubuntu-latest
@@ -87,7 +80,6 @@ jobs:
         with:
           go-version: stable
       - run: go run golang.org/x/vuln/cmd/govulncheck@v1.6.0 ./...
-
   # Keep this stable check name: the main branch ruleset requires "test".
   test:
     name: test
@@ -119,7 +111,6 @@ jobs:
               exit 1
             fi
           done
-
   # Keep this stable check name: the main branch ruleset requires "lint".
   lint:
     name: lint

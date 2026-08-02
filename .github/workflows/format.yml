@@ -1,5 +1,4 @@
 name: Go formatting
-
 on:
   pull_request:
     types:
@@ -7,13 +6,10 @@ on:
       - synchronize
       - reopened
       - closed
-
 permissions: {}
-
 concurrency:
   group: go-formatting-${{ github.event.pull_request.number }}
   cancel-in-progress: false
-
 jobs:
   format:
     # Fork pull requests receive a read-only GITHUB_TOKEN, so they cannot

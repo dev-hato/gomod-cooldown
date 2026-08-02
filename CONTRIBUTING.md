@@ -12,8 +12,15 @@ the private process in [SECURITY.md](SECURITY.md), not a public issue.
 
 ## Development setup
 
-Go 1.25 or later is required. Clone the repository and run the same core checks
-used by CI:
+Go 1.25 or later is required. Install
+[pre-commit](https://pre-commit.com/) and enable the repository's Gitleaks
+hook after cloning:
+
+```sh
+pre-commit install
+```
+
+Run the same core checks used by CI:
 
 ```sh
 gofmt -w cmd internal

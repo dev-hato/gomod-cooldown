@@ -1,8 +1,6 @@
 version: "2"
-
 run:
   tests: true
-
 linters:
   default: all
   # Disabled linters either target dependencies not used by this project or
@@ -59,7 +57,6 @@ linters:
           - noctx
           - revive
           - usestdlibvars
-
 formatters:
   enable:
     - gofmt

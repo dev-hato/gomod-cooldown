@@ -17,23 +17,15 @@ Go projectまたはGoogleと提携・承認・スポンサー関係はありま�
 
 `gomod-cooldown` のbuildとinstallにはGo 1.25以降が必要です。
 
-v1.0.0の公開後は、再現可能な環境にするため、そのstable releaseをexact指定して
-installします。
+公開済みの最新stable releaseをinstallします。
 
 ```sh
-go install github.com/dev-hato/gomod-cooldown/cmd/gomod-cooldown@v1.0.0
+go install github.com/dev-hato/gomod-cooldown/cmd/gomod-cooldown@latest
 ```
 
-release candidateの評価期間中は、`v1.0.0-rc.1` の公開後にexactなcandidate tagを
-使います。未公開の `@v1.0.0` はまだ利用できません。
-
-```sh
-go install github.com/dev-hato/gomod-cooldown/cmd/gomod-cooldown@v1.0.0-rc.1
-```
-
-常に公開済みの最新版を意図的に追う場合だけ、代わりに `@latest` を使います。tag付きの
-stable releaseが1つもない場合だけ、`@latest` はpre-releaseを候補にします。exact versionを
-使うと、version discoveryのタイミングにも左右されずにinstallできます。
+再現可能な環境にするには、`latest` を使いたい公開済みのexact versionに置き換えてください。
+`@latest` は最新のtag付きstable releaseを選び、stable releaseが1つもない場合だけ
+pre-releaseを候補にします。
 
 チェックアウトしたソースからは、`go build ./cmd/gomod-cooldown` でbuildできます。
 

@@ -17,24 +17,15 @@ It is not affiliated with, endorsed by, or sponsored by the Go project or Google
 
 Go 1.25 or later is required to build or install `gomod-cooldown`.
 
-After v1.0.0 has been published, install that specific stable release for a
-reproducible setup:
+Install the latest published stable release:
 
 ```sh
-go install github.com/Goryudyuma/gomod-cooldown/cmd/gomod-cooldown@v1.0.0
+go install github.com/Goryudyuma/gomod-cooldown/cmd/gomod-cooldown@latest
 ```
 
-After `v1.0.0-rc.1` has been published during the release-candidate period,
-use that exact candidate tag instead; the unpublished `@v1.0.0` tag will not
-work yet:
-
-```sh
-go install github.com/Goryudyuma/gomod-cooldown/cmd/gomod-cooldown@v1.0.0-rc.1
-```
-
-Use `@latest` only when intentionally following the newest published release.
-It considers a pre-release only when no tagged stable release is available.
-Exact versions also make installation independent of version-discovery timing.
+For a reproducible setup, replace `latest` with the exact published version you
+want to use. `@latest` selects the newest tagged stable release; it considers a
+pre-release only when no stable release is available.
 
 Alternatively, build the checked-out source with
 `go build ./cmd/gomod-cooldown`.

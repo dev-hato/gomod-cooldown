@@ -15,6 +15,7 @@ import (
 	"os/exec"
 	"os/signal"
 	"runtime/debug"
+	"slices"
 	"strings"
 	"time"
 
@@ -46,13 +47,7 @@ type Options struct {
 
 // Parse parses command-line arguments without modifying the process environment.
 func Parse(args []string, _ io.Writer) (Options, error) {
-	sep := -1
-	for i, arg := range args {
-		if arg == "--" {
-			sep = i
-			break
-		}
-	}
+	sep := slices.Index(args, "--")
 	flagArgs := args
 	if sep >= 0 {
 		flagArgs = args[:sep]
@@ -74,10 +69,13 @@ func Parse(args []string, _ io.Writer) (Options, error) {
 
 	// This check must stay after the help/version early returns above:
 	// --help and --version are valid without a -- separator, so checking this first would reject them incorrectly.
-	if sep < 0 || sep == len(args)-1 {
+	if sep < 0 || sep+1 >= len(args) {
 		return Options{}, errors.New("a command after -- is required")
 	}
-	if args[sep+1] == "" {
+
+	command := args[sep+1:]
+
+	if command[0] == "" {
 		return Options{}, errors.New("command must not be empty")
 	}
 
@@ -93,7 +91,7 @@ func Parse(args []string, _ io.Writer) (Options, error) {
 	}
 	return Options{
 		Cooldown: d, Upstream: values.upstream, TimeSource: values.timeSource,
-		UpstreamTimeout: values.timeout, Verbose: values.verbose, Command: args[sep+1:],
+		UpstreamTimeout: values.timeout, Verbose: values.verbose, Command: command,
 	}, nil
 }
 

@@ -77,10 +77,10 @@ func Parse(args []string, _ io.Writer) (Options, error) {
 	if sep < 0 || sep == len(args)-1 {
 		return Options{}, errors.New("a command after -- is required")
 	}
-
 	if args[sep+1] == "" {
 		return Options{}, errors.New("command must not be empty")
 	}
+
 	d, err := ParseCooldown(values.cooldown)
 	if err != nil {
 		return Options{}, err

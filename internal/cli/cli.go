@@ -66,10 +66,14 @@ func Parse(args []string, _ io.Writer) (Options, error) {
 	if values.version {
 		return Options{action: actionVersion}, nil
 	}
-	if sep < 0 || sep == len(args)-1 {
+
+	if sep < 0 || sep+1 >= len(args) {
 		return Options{}, errors.New("a command after -- is required")
 	}
-	if args[sep+1] == "" {
+
+	command := args[sep+1:]
+
+	if command[0] == "" {
 		return Options{}, errors.New("command must not be empty")
 	}
 	d, err := ParseCooldown(values.cooldown)
@@ -84,7 +88,7 @@ func Parse(args []string, _ io.Writer) (Options, error) {
 	}
 	return Options{
 		Cooldown: d, Upstream: values.upstream, TimeSource: values.timeSource,
-		UpstreamTimeout: values.timeout, Verbose: values.verbose, Command: args[sep+1:],
+		UpstreamTimeout: values.timeout, Verbose: values.verbose, Command: command,
 	}, nil
 }
 

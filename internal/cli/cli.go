@@ -67,6 +67,8 @@ func Parse(args []string, _ io.Writer) (Options, error) {
 		return Options{action: actionVersion}, nil
 	}
 
+	// This check must stay after the help/version early returns above:
+	// --help and --version are valid without a -- separator, so checking this first would reject them incorrectly.
 	if sep < 0 || sep+1 >= len(args) {
 		return Options{}, errors.New("a command after -- is required")
 	}

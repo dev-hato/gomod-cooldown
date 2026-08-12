@@ -53,10 +53,12 @@ func Parse(args []string, _ io.Writer) (Options, error) {
 			break
 		}
 	}
-	flagArgs := args
-	if sep >= 0 {
-		flagArgs = args[:sep]
+
+	if sep < 0 || sep == len(args)-1 {
+		return Options{}, errors.New("a command after -- is required")
 	}
+
+	flagArgs := args[:sep]
 	fs, values := newFlagSet()
 	err := fs.Parse(flagArgs)
 	if err != nil {
@@ -70,9 +72,6 @@ func Parse(args []string, _ io.Writer) (Options, error) {
 	}
 	if values.version {
 		return Options{action: actionVersion}, nil
-	}
-	if sep < 0 || sep == len(args)-1 {
-		return Options{}, errors.New("a command after -- is required")
 	}
 	if args[sep+1] == "" {
 		return Options{}, errors.New("command must not be empty")

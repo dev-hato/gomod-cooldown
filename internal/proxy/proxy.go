@@ -155,10 +155,11 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func moduleFor(rawPath, suffix string) (string, bool) {
-	if !strings.HasSuffix(rawPath, suffix) {
+	trimmed, ok := strings.CutSuffix(rawPath, suffix)
+	if !ok {
 		return "", false
 	}
-	escaped := strings.TrimPrefix(strings.TrimSuffix(rawPath, suffix), "/")
+	escaped := strings.TrimPrefix(trimmed, "/")
 	if escaped == "" {
 		return "", false
 	}

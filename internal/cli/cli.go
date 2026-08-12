@@ -15,6 +15,7 @@ import (
 	"os/exec"
 	"os/signal"
 	"runtime/debug"
+	"slices"
 	"strings"
 	"time"
 
@@ -46,13 +47,7 @@ type Options struct {
 
 // Parse parses command-line arguments without modifying the process environment.
 func Parse(args []string, _ io.Writer) (Options, error) {
-	sep := -1
-	for i, arg := range args {
-		if arg == "--" {
-			sep = i
-			break
-		}
-	}
+	sep := slices.Index(args, "--")
 	flagArgs := args
 	if sep >= 0 {
 		flagArgs = args[:sep]

@@ -11,6 +11,7 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -83,8 +84,7 @@ func (e *infoStatusError) Error() string {
 
 func unavailableInfo(err error) bool {
 	var statusErr *infoStatusError
-	return errors.As(err, &statusErr) &&
-		(statusErr.status == http.StatusNotFound || statusErr.status == http.StatusGone)
+	return errors.As(err, &statusErr) && slices.Contains([]int{http.StatusNotFound, http.StatusGone}, statusErr.status)
 }
 
 // VersionInfo is validated metadata returned by a GOPROXY .info endpoint.

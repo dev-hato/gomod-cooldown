@@ -77,10 +77,7 @@ func Parse(args []string, _ io.Writer) (Options, error) {
 	if args[sep+1] == "" {
 		return Options{}, errors.New("command must not be empty")
 	}
-	d, err := ParseCooldown(values.cooldown)
-	if err != nil {
-		return Options{}, err
-	}
+
 	if values.timeout <= 0 {
 		return Options{}, errors.New("upstream-timeout must be positive")
 	}
@@ -88,13 +85,13 @@ func Parse(args []string, _ io.Writer) (Options, error) {
 		return Options{}, fmt.Errorf("unsupported time-source %q", values.timeSource)
 	}
 	return Options{
-		Cooldown: d, Upstream: values.upstream, TimeSource: values.timeSource,
+		Cooldown: values.cooldown, Upstream: values.upstream, TimeSource: values.timeSource,
 		UpstreamTimeout: values.timeout, Verbose: values.verbose, Command: args[sep+1:],
 	}, nil
 }
 
 type flagValues struct {
-	cooldown   string
+	cooldown   time.Duration
 	upstream   string
 	timeSource string
 	timeout    time.Duration
@@ -103,11 +100,33 @@ type flagValues struct {
 	version    bool
 }
 
+// cooldownValue adapts ParseCooldown to the flag.Value interface,
+// so invalid --cooldown values are rejected during fs.Parse itself.
+type cooldownValue time.Duration
+
+func (c *cooldownValue) String() string {
+	if c == nil {
+		return ""
+	}
+
+	return time.Duration(*c).String()
+}
+
+func (c *cooldownValue) Set(s string) error {
+	d, err := ParseCooldown(s)
+	if err != nil {
+		return err
+	}
+
+	*c = cooldownValue(d)
+	return nil
+}
+
 func newFlagSet() (*flag.FlagSet, *flagValues) {
-	values := &flagValues{}
+	values := &flagValues{cooldown: 14 * 24 * time.Hour}
 	fs := flag.NewFlagSet("gomod-cooldown", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
-	fs.StringVar(&values.cooldown, "cooldown", "14d", "minimum availability age")
+	fs.Var((*cooldownValue)(&values.cooldown), "cooldown", "minimum availability age")
 	fs.StringVar(&values.upstream, "upstream", "https://proxy.golang.org", "upstream GOPROXY URL")
 	fs.StringVar(&values.timeSource, "time-source", "commit", "availability source: commit (default) or combined")
 	fs.DurationVar(&values.timeout, "upstream-timeout", 30*time.Second, "upstream HTTP timeout")

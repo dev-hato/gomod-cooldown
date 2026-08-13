@@ -235,13 +235,13 @@ func (s *Server) handleLatest(w http.ResponseWriter, r *http.Request, path strin
 		}
 		latest = tagInfo
 	}
-	ok, err = s.allowed(r.Context(), path, latest)
+	allowed, err := s.allowed(r.Context(), path, latest)
 	if err != nil {
 		s.badGateway(w, err)
 		return
 	}
 	incompatibleTag := strings.HasSuffix(latest.Version, "+incompatible") && !module.IsPseudoVersion(latest.Version)
-	if ok && !incompatibleTag {
+	if allowed && !incompatibleTag {
 		s.writeUpstream(w, http.StatusOK, contentType, body)
 		return
 	}

@@ -68,7 +68,7 @@ func (f Fetcher) Snapshot(ctx context.Context, cutoff time.Time) (map[string]tim
 		if len(page) < pageLimit {
 			return recent, nil
 		}
-		if last.IsZero() || !last.After(cursor) {
+		if last.IsZero() || !cursor.Before(last) {
 			return nil, fmt.Errorf("index cursor did not advance from %s", cursor.Format(time.RFC3339Nano))
 		}
 		cursor = last

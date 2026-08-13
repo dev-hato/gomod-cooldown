@@ -107,9 +107,9 @@ func newFlagSet() (*flag.FlagSet, *flagValues) {
 	values := &flagValues{}
 	fs := flag.NewFlagSet("gomod-cooldown", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
-	fs.StringVar(&values.cooldown, "cooldown", "14d", "minimum availability age")
-	fs.StringVar(&values.upstream, "upstream", "https://proxy.golang.org", "upstream GOPROXY URL")
-	fs.StringVar(&values.timeSource, "time-source", "commit", "availability source: commit (default) or combined")
+	fs.StringVar(&values.cooldown, "cooldown", "14d", "minimum availability age; accepts fractional days, formatted as a `duration`")
+	fs.StringVar(&values.upstream, "upstream", "https://proxy.golang.org", "upstream GOPROXY `URL`")
+	fs.StringVar(&values.timeSource, "time-source", "commit", "availability source, provided as a `value`: commit (default) or combined")
 	fs.DurationVar(&values.timeout, "upstream-timeout", 30*time.Second, "upstream HTTP timeout")
 	fs.BoolVar(&values.verbose, "verbose", false, "log upstream requests and decisions")
 	fs.BoolVar(&values.help, "help", false, "show this help and exit")
@@ -124,14 +124,10 @@ func writeUsage(w io.Writer) {
 Run a command with a temporary GOPROXY that hides module versions still in cooldown.
 
 Options:
-  --cooldown duration         Minimum availability age; accepts fractional days (default: 14d)
-  --upstream URL              Upstream GOPROXY URL (default: https://proxy.golang.org)
-  --time-source value         Availability source: commit or combined (default: commit)
-  --upstream-timeout duration Upstream HTTP timeout (default: 30s)
-  --verbose                   Log upstream requests and decisions
-  -h, --help                  Show this help and exit
-  --version                   Show version and exit
 `)
+	fs, _ := newFlagSet()
+	fs.SetOutput(w)
+	fs.PrintDefaults()
 }
 
 // ParseCooldown accepts time.ParseDuration plus a day suffix, where one day is

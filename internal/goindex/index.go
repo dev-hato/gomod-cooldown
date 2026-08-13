@@ -97,8 +97,9 @@ func (f Fetcher) client() (*url.URL, *http.Client, error) {
 
 func fetchPage(ctx context.Context, client *http.Client, base *url.URL, cursor time.Time) ([]Record, error) {
 	q := url.Values{"since": []string{cursor.Format(time.RFC3339Nano)}, "limit": []string{strconv.Itoa(pageLimit)}}
-	reqURL := strings.TrimRight(base.String(), "/") + "/index?" + q.Encode()
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqURL, nil)
+	reqURL := base.JoinPath("index")
+	reqURL.RawQuery = q.Encode()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqURL.String(), nil)
 	if err != nil {
 		return nil, fmt.Errorf("create index request: %w", err)
 	}

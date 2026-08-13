@@ -15,6 +15,7 @@ import (
 	"os/exec"
 	"os/signal"
 	"runtime/debug"
+	"slices"
 	"strings"
 	"time"
 
@@ -186,8 +187,8 @@ func dayNumberCanStart(s string, start int) bool {
 	if start == 1 && (s[0] == '+' || s[0] == '-') {
 		return true
 	}
-	previous := s[start-1]
-	return previous == 'd' || previous == 'h' || previous == 'm' || previous == 's'
+
+	return slices.Contains([]uint8{'d', 'h', 'm', 's'}, s[start-1])
 }
 
 func scanDecimal(s string, start int) (int, bool) {

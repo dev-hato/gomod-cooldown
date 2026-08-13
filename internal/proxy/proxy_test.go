@@ -853,8 +853,9 @@ func (c *doneObservingContext) Done() <-chan struct{} {
 	return c.Context.Done()
 }
 
-func receiveWithin[T any](t *testing.T, ch <-chan T, operation string) (result T) {
+func receiveWithin[T any](t *testing.T, ch <-chan T, operation string) T {
 	t.Helper()
+	var result T
 
 	select {
 	case result = <-ch:
@@ -862,7 +863,7 @@ func receiveWithin[T any](t *testing.T, ch <-chan T, operation string) (result T
 		t.Fatalf("%s did not finish", operation)
 	}
 
-	return
+	return result
 }
 
 func requireOKStatuses(t *testing.T, statuses <-chan int, count int) {

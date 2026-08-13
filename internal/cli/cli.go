@@ -190,26 +190,27 @@ func dayNumberCanStart(s string, start int) bool {
 	return previous == 'd' || previous == 'h' || previous == 'm' || previous == 's'
 }
 
-func scanDigits(s string, i int) int {
+func scanDigits(s string, start int) (int, bool) {
+	i := start
+
 	for i < len(s) && s[i] >= '0' && s[i] <= '9' {
 		i++
 	}
 
-	return i
+	return i, start < i
 }
 
 func scanDecimal(s string, start int) (int, bool) {
-	i := scanDigits(s, start)
-	digits := i - start
+	i, hasDigits := scanDigits(s, start)
 
 	if i < len(s) && s[i] == '.' {
+		var hasFractionDigits bool
 		i++
-		afterDot := i
-		i = scanDigits(s, afterDot)
-		digits += i - afterDot
+		i, hasFractionDigits = scanDigits(s, i)
+		hasDigits = hasDigits || hasFractionDigits
 	}
 
-	return i, digits > 0
+	return i, hasDigits
 }
 
 func dayNanoseconds(decimal string) (string, error) {

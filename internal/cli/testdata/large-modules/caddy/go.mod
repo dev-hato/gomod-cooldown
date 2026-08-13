@@ -12,7 +12,7 @@ require (
 	github.com/caddyserver/certmagic v0.25.3
 	github.com/caddyserver/zerossl v0.1.5
 	github.com/cloudflare/circl v1.6.3
-	github.com/dunglas/go-urlpattern v0.0.0-20260421141449-cbab7cf1e16d
+	github.com/dunglas/go-urlpattern v0.0.0-20260716093037-fb05c4998526
 	github.com/dustin/go-humanize v1.0.1
 	github.com/go-chi/chi/v5 v5.2.5
 	github.com/google/cel-go v0.29.2

@@ -107,9 +107,9 @@ func newFlagSet() (*flag.FlagSet, *flagValues) {
 	values := &flagValues{}
 	fs := flag.NewFlagSet("gomod-cooldown", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
-	fs.StringVar(&values.cooldown, "cooldown", "14d", "minimum availability age; accepts fractional days, formatted as a `duration`")
-	fs.StringVar(&values.upstream, "upstream", "https://proxy.golang.org", "upstream GOPROXY `URL`")
-	fs.StringVar(&values.timeSource, "time-source", "commit", "availability source, provided as a `value`: commit (default) or combined")
+	fs.StringVar(&values.cooldown, "cooldown", "14d", "minimum availability age; accepts Go duration strings plus a 'd' day suffix (e.g. 14d, 168h, 1.5d)")
+	fs.StringVar(&values.upstream, "upstream", "https://proxy.golang.org", "upstream GOPROXY URL")
+	fs.StringVar(&values.timeSource, "time-source", "commit", "availability source: commit or combined")
 	fs.DurationVar(&values.timeout, "upstream-timeout", 30*time.Second, "upstream HTTP timeout")
 	fs.BoolVar(&values.verbose, "verbose", false, "log upstream requests and decisions")
 	fs.BoolVar(&values.help, "help", false, "show this help and exit")

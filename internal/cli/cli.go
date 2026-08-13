@@ -190,20 +190,25 @@ func dayNumberCanStart(s string, start int) bool {
 	return previous == 'd' || previous == 'h' || previous == 'm' || previous == 's'
 }
 
-func scanDecimal(s string, start int) (int, bool) {
-	i := start
-	digits := 0
+func scanDigits(s string, i int) int {
 	for i < len(s) && s[i] >= '0' && s[i] <= '9' {
 		i++
-		digits++
 	}
+
+	return i
+}
+
+func scanDecimal(s string, start int) (int, bool) {
+	i := scanDigits(s, start)
+	digits := i - start
+
 	if i < len(s) && s[i] == '.' {
 		i++
-		for i < len(s) && s[i] >= '0' && s[i] <= '9' {
-			i++
-			digits++
-		}
+		afterDot := i
+		i = scanDigits(s, afterDot)
+		digits += i - afterDot
 	}
+
 	return i, digits > 0
 }
 

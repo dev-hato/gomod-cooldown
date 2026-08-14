@@ -31,10 +31,12 @@ jobs:
         if: github.event.action != 'closed'
         with:
           go-version-file: go.mod
+      - uses: flatt-security/setup-takumi-guard-golang@1c8aa7498f7f635fbd6ad6a0f436d03092b3502d # v1.1.0
+        if: github.event.action != 'closed'
       - uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
         if: github.event.action != 'closed'
         with:
-          version: v2.12.2
+          version-file: .tool-versions
           install-only: true
       - run: golangci-lint fmt
         if: github.event.action != 'closed'

@@ -99,7 +99,7 @@ Only these version-discovery endpoints are filtered:
 ```
 
 All version-specific endpoints, including `.info`, `.mod`, and `.zip`, and all
-other GOPROXY endpoints are passed through to the configured upstream. Therefore
+other GOPROXY endpoints are passed through to the configured upstream. Therefore,
 an explicit request such as `go get example.com/mod@v1.2.3` and a version already
 recorded in `go.mod` can be downloaded even during its cooldown.
 
@@ -173,7 +173,7 @@ version-specific endpoints.
 - Traditional interactive shell job control with `Ctrl-Z` and `fg` is not
   currently supported while the Linux or macOS wrapper has handed the terminal
   foreground to the child. Avoid suspending a wrapped command; SIGINT and
-  SIGTERM remain supported. Other Unix targets are best effort: non-terminal
+  SIGTERM remain supported. Other Unix targets are best-effort: non-terminal
   children use a dedicated process group, while character-device stdin keeps
   the wrapper and child in a shared group to preserve interactive input. The
   one-delivery process-group guarantee above is limited to Linux and macOS.

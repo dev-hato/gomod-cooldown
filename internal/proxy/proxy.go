@@ -368,7 +368,7 @@ func (s *Server) allowed(ctx context.Context, path string, info VersionInfo) (bo
 		return false, fmt.Errorf("availability time for %s@%s: %w", path, info.Version, err)
 	}
 	cutoff := s.now().Add(-s.cooldown)
-	ok := !a.AvailableAt.After(cutoff)
+	ok := a.AvailableAt.Before(cutoff) || a.AvailableAt.Equal(cutoff)
 	if !ok {
 		first := ""
 		if a.FirstCached != nil {

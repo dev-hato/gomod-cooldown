@@ -353,12 +353,9 @@ func (s *Server) filter(ctx context.Context, path string, versions []string) ([]
 }
 
 func containsHigherIncompatible(versions []string, compatible string) bool {
-	for _, version := range versions {
-		if higherIncompatible(version, compatible) {
-			return true
-		}
-	}
-	return false
+	return slices.ContainsFunc(versions, func(version string) bool {
+		return higherIncompatible(version, compatible)
+	})
 }
 
 func higherIncompatible(version, compatible string) bool {

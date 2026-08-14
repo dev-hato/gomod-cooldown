@@ -12,7 +12,7 @@ the private process in [SECURITY.md](SECURITY.md), not a public issue.
 
 ## Development setup
 
-Go 1.25 or later is required. Install
+Go 1.26.6 or later is required. Install
 [pre-commit](https://pre-commit.com/) and enable the repository's Gitleaks
 hook after cloning:
 

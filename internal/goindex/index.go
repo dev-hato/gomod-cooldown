@@ -68,7 +68,7 @@ func (f Fetcher) Snapshot(ctx context.Context, cutoff time.Time) (map[string]tim
 		if len(records) < recordsLimit {
 			return recent, nil
 		}
-		if last.IsZero() || !last.After(cursor) {
+		if last.IsZero() || last.Before(cursor) || last.Equal(cursor) {
 			return nil, fmt.Errorf("index cursor did not advance from %s", cursor.Format(time.RFC3339Nano))
 		}
 		cursor = last
@@ -97,8 +97,9 @@ func (f Fetcher) client() (*url.URL, *http.Client, error) {
 
 func fetchRecords(ctx context.Context, client *http.Client, base *url.URL, cursor time.Time) ([]Record, error) {
 	q := url.Values{"since": []string{cursor.Format(time.RFC3339Nano)}, "limit": []string{strconv.Itoa(recordsLimit)}}
-	reqURL := strings.TrimRight(base.String(), "/") + "/index?" + q.Encode()
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqURL, nil)
+	reqURL := base.JoinPath("index")
+	reqURL.RawQuery = q.Encode()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqURL.String(), nil)
 	if err != nil {
 		return nil, fmt.Errorf("create index request: %w", err)
 	}

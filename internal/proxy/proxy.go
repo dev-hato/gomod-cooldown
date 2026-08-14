@@ -155,10 +155,11 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func moduleFor(rawPath, suffix string) (string, bool) {
-	if !strings.HasSuffix(rawPath, suffix) {
+	trimmed, ok := strings.CutSuffix(rawPath, suffix)
+	if !ok {
 		return "", false
 	}
-	escaped := strings.TrimPrefix(strings.TrimSuffix(rawPath, suffix), "/")
+	escaped := strings.TrimPrefix(trimmed, "/")
 	if escaped == "" {
 		return "", false
 	}
@@ -352,12 +353,9 @@ func (s *Server) filter(ctx context.Context, path string, versions []string) ([]
 }
 
 func containsHigherIncompatible(versions []string, compatible string) bool {
-	for _, version := range versions {
-		if higherIncompatible(version, compatible) {
-			return true
-		}
-	}
-	return false
+	return slices.ContainsFunc(versions, func(version string) bool {
+		return higherIncompatible(version, compatible)
+	})
 }
 
 func higherIncompatible(version, compatible string) bool {
@@ -370,7 +368,7 @@ func (s *Server) allowed(ctx context.Context, path string, info VersionInfo) (bo
 		return false, fmt.Errorf("availability time for %s@%s: %w", path, info.Version, err)
 	}
 	cutoff := s.now().Add(-s.cooldown)
-	ok := !a.AvailableAt.After(cutoff)
+	ok := a.AvailableAt.Before(cutoff) || a.AvailableAt.Equal(cutoff)
 	if !ok {
 		first := ""
 		if a.FirstCached != nil {

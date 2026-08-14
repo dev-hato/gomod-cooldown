@@ -11,15 +11,35 @@ concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 jobs:
+  go-versions:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      matrix: ${{ env.VERSIONS }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+      - name: Stable
+        id: stable
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
+        with:
+          go-version: stable
+      - run: echo "MOD_VERSION=$(awk '/^go /{print $2; exit}' go.mod)" >> "$GITHUB_ENV"
+      - run: echo "OLDEST_VERSION=$(printf '%s\n%s\n' "${MOD_VERSION}" "${{ steps.stable.outputs.go-version }}" | sort -V | head -n1)" >> "$GITHUB_ENV"
+      - if: ${{ env.OLDEST_VERSION == env.MOD_VERSION && steps.stable.outputs.go-version != env.MOD_VERSION }}
+        run: echo "VERSIONS=[\"${MOD_VERSION}\", \"stable\"]" >> "$GITHUB_ENV"
+      - if: ${{ env.OLDEST_VERSION == steps.stable.outputs.go-version }}
+        run: echo "VERSIONS=[\"${MOD_VERSION}\"]" >> "$GITHUB_ENV"
   unit:
     name: unit (Go ${{ matrix.go-version }})
+    needs: go-versions
     runs-on: ubuntu-latest
     timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
-        go-version:
-          - 1.26.6
+        go-version: ${{ fromJson(needs.go-versions.outputs.matrix) }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0

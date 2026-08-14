@@ -20,15 +20,15 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - name: Stable
-        id: stable
+      - name: Get stable version
+        id: get-stable-version
         uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
         with:
           go-version: stable
       - name: Get matrix
         id: get-matrix
         env:
-          STABLE_VERSION: ${{ steps.stable.outputs.go-version }}
+          STABLE_VERSION: ${{ steps.get-stable-version.outputs.go-version }}
         run: |
           mod_version=$(awk '/^go /{print $2; exit}' go.mod)
           oldest=$(printf '%s\n%s\n' "${mod_version}" "${STABLE_VERSION}" | sort -V | head -n1)

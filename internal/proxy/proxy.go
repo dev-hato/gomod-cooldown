@@ -170,18 +170,30 @@ func moduleFor(rawPath, suffix string) (string, bool) {
 	return path, true
 }
 
-func (s *Server) handleList(w http.ResponseWriter, r *http.Request, path string) {
+// fetchDiscovery fetches the upstream discovery response for path,
+// writing an error or passthrough response to w when the request cannot be handled further.
+// The final return value reports whether the caller should continue processing body and contentType.
+func (s *Server) fetchDiscovery(w http.ResponseWriter, r *http.Request, path string) ([]byte, string, bool) {
 	body, status, contentType, err := s.fetch(r.Context(), r.URL.EscapedPath())
 	if err != nil {
 		s.badGateway(w, err)
-		return
+		return nil, "", false
 	}
 	if status >= http.StatusMultipleChoices && status < http.StatusBadRequest {
 		s.badGateway(w, fmt.Errorf("upstream redirected discovery request for %s", path))
-		return
+		return nil, "", false
 	}
 	if status != http.StatusOK {
 		s.writeUpstream(w, status, contentType, body)
+		return nil, "", false
+	}
+
+	return body, contentType, true
+}
+
+func (s *Server) handleList(w http.ResponseWriter, r *http.Request, path string) {
+	body, _, ok := s.fetchDiscovery(w, r, path)
+	if !ok {
 		return
 	}
 	versions := parseList(body)
@@ -199,17 +211,8 @@ func (s *Server) handleList(w http.ResponseWriter, r *http.Request, path string)
 }
 
 func (s *Server) handleLatest(w http.ResponseWriter, r *http.Request, path string) {
-	body, status, contentType, err := s.fetch(r.Context(), r.URL.EscapedPath())
-	if err != nil {
-		s.badGateway(w, err)
-		return
-	}
-	if status >= http.StatusMultipleChoices && status < http.StatusBadRequest {
-		s.badGateway(w, fmt.Errorf("upstream redirected discovery request for %s", path))
-		return
-	}
-	if status != http.StatusOK {
-		s.writeUpstream(w, status, contentType, body)
+	body, contentType, ok := s.fetchDiscovery(w, r, path)
+	if !ok {
 		return
 	}
 	latest, err := validateInfo(body, "")
@@ -233,14 +236,14 @@ func (s *Server) handleLatest(w http.ResponseWriter, r *http.Request, path strin
 		}
 		latest = tagInfo
 	}
-	ok, err := s.allowed(r.Context(), path, latest)
+	allowed, err := s.allowed(r.Context(), path, latest)
 	if err != nil {
 		s.badGateway(w, err)
 		return
 	}
 	incompatibleTag := strings.HasSuffix(latest.Version, "+incompatible") && !module.IsPseudoVersion(latest.Version)
-	if ok && !incompatibleTag {
-		s.writeUpstream(w, status, contentType, body)
+	if allowed && !incompatibleTag {
+		s.writeUpstream(w, http.StatusOK, contentType, body)
 		return
 	}
 	// A compatible version hidden by the cooldown can otherwise make an older,

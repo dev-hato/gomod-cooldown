@@ -1,4 +1,4 @@
-name: Go formatting
+name: formatting
 on:
   pull_request:
     types:

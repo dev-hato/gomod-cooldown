@@ -68,5 +68,5 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           branch-name-prefix: chore/format
           pr-title-prefix: "chore: apply formatting and sync README"
-          pr-description-prefix: "Automated formatting changes produced by golangci-lint fmt, and README/README.ja regenerated from their templates."
+          pr-description-prefix: "Automated formatting changes produced by golangci-lint fmt, prettier, and README/README.ja regenerated from their templates."
           exit-failure: false

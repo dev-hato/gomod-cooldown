@@ -27,7 +27,9 @@ jobs:
         with:
           fetch-depth: 0
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+      - name: Setup Go
+        id: setup-go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         if: github.event.action != 'closed'
         with:
           go-version-file: go.mod
@@ -40,11 +42,20 @@ jobs:
           install-only: true
       - run: golangci-lint fmt
         if: github.event.action != 'closed'
+      - name: Update README
+        if: github.event.action != 'closed'
+        env:
+          GO_VERSION: ${{ steps.setup-go.outputs.go-version }}
+        run: |
+          for name in README README.ja
+          do
+            envsubst '$GO_VERSION' < "$name.template.md" > "$name.md"
+          done
       - uses: dev-hato/actions-diff-pr-management@571be0d9572aaf77cdd315c12d6e73a1112910d7 # v2.2.6
         if: success() || failure()
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           branch-name-prefix: chore/gofmt
-          pr-title-prefix: "chore: apply Go formatting"
-          pr-description-prefix: "Automated formatting changes produced by golangci-lint fmt."
+          pr-title-prefix: "chore: apply Go formatting and sync README"
+          pr-description-prefix: "Automated formatting changes produced by golangci-lint fmt, and README/README.ja regenerated from their templates."
           exit-failure: false

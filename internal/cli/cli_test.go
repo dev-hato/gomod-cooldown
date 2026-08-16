@@ -131,6 +131,13 @@ func TestRunHelpAndVersion(t *testing.T) {
 		if !strings.HasPrefix(stdout.String(), "Usage: gomod-cooldown ") || !strings.Contains(stdout.String(), "-- command") {
 			t.Fatalf("Run(%q) stdout=%q", args, stdout.String())
 		}
+
+		for _, flagName := range []string{"-cooldown", "-upstream", "-time-source", "-version"} {
+			if !strings.Contains(stdout.String(), flagName) {
+				t.Fatalf("Run(%q) stdout missing %q: %q", args, flagName, stdout.String())
+			}
+		}
+
 		if stderr.Len() != 0 {
 			t.Fatalf("Run(%q) stderr=%q", args, stderr.String())
 		}

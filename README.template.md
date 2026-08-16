@@ -104,8 +104,7 @@ other GOPROXY endpoints are passed through to the configured upstream. Therefore
 an explicit request such as `go get example.com/mod@v1.2.3` and a version already
 recorded in `go.mod` can be downloaded even during its cooldown.
 
-An upstream `@v/list` may name a version whose `.info` endpoint returns 404 or
-410. When that happens, the wrapper treats only that unavailable version as
+An upstream `@v/list` may name a version whose `.info` endpoint returns 404 or 410. When that happens, the wrapper treats only that unavailable version as
 unusable and omits it from discovery. That negative result is cached for the
 rest of the CLI invocation. Other `.info` failures, including 403, 429, 5xx,
 transport errors, and malformed or inconsistent metadata, continue to fail

@@ -63,7 +63,7 @@ func (s CombinedSource) AvailableAt(_ context.Context, path, version string, com
 	a := Availability{CommitTime: commit, AvailableAt: commit}
 	if cached, ok := s.Recent[Key(path, version)]; ok {
 		a.FirstCached = &cached
-		if cached.After(a.AvailableAt) {
+		if a.AvailableAt.Before(cached) {
 			a.AvailableAt = cached
 		}
 	}

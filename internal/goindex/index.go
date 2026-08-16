@@ -16,7 +16,7 @@ import (
 	"github.com/dev-hato/gomod-cooldown/internal/availability"
 )
 
-const pageLimit = 2000
+const recordsLimit = 2000
 
 // Record is one timestamped module-version entry from the index feed.
 type Record struct {
@@ -57,18 +57,18 @@ func (f Fetcher) Snapshot(ctx context.Context, cutoff time.Time) (map[string]tim
 	cursor := cutoff.Add(-time.Nanosecond).UTC()
 	recent := make(map[string]time.Time)
 	for {
-		page, err := fetchPage(ctx, client, u, cursor)
+		records, err := fetchRecords(ctx, client, u, cursor)
 		if err != nil {
 			return nil, err
 		}
-		last, err := addRecent(recent, page, cutoff)
+		last, err := addRecent(recent, records, cutoff)
 		if err != nil {
 			return nil, err
 		}
-		if len(page) < pageLimit {
+		if len(records) < recordsLimit {
 			return recent, nil
 		}
-		if last.IsZero() || !last.After(cursor) {
+		if last.IsZero() || last.Before(cursor) || last.Equal(cursor) {
 			return nil, fmt.Errorf("index cursor did not advance from %s", cursor.Format(time.RFC3339Nano))
 		}
 		cursor = last
@@ -95,10 +95,11 @@ func (f Fetcher) client() (*url.URL, *http.Client, error) {
 	return u, &clientCopy, nil
 }
 
-func fetchPage(ctx context.Context, client *http.Client, base *url.URL, cursor time.Time) ([]Record, error) {
-	q := url.Values{"since": []string{cursor.Format(time.RFC3339Nano)}, "limit": []string{strconv.Itoa(pageLimit)}}
-	reqURL := strings.TrimRight(base.String(), "/") + "/index?" + q.Encode()
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqURL, nil)
+func fetchRecords(ctx context.Context, client *http.Client, base *url.URL, cursor time.Time) ([]Record, error) {
+	q := url.Values{"since": []string{cursor.Format(time.RFC3339Nano)}, "limit": []string{strconv.Itoa(recordsLimit)}}
+	reqURL := base.JoinPath("index")
+	reqURL.RawQuery = q.Encode()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqURL.String(), nil)
 	if err != nil {
 		return nil, fmt.Errorf("create index request: %w", err)
 	}
@@ -113,9 +114,9 @@ func fetchPage(ctx context.Context, client *http.Client, base *url.URL, cursor t
 	return decodePage(resp.Body)
 }
 
-func addRecent(recent map[string]time.Time, page []Record, cutoff time.Time) (time.Time, error) {
+func addRecent(recent map[string]time.Time, records []Record, cutoff time.Time) (time.Time, error) {
 	var last time.Time
-	for _, r := range page {
+	for _, r := range records {
 		if r.Path == "" || r.Version == "" || r.Timestamp.IsZero() {
 			return time.Time{}, errors.New("invalid index record")
 		}

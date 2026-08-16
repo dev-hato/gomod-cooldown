@@ -15,6 +15,7 @@ import (
 	"os/exec"
 	"os/signal"
 	"runtime/debug"
+	"slices"
 	"strings"
 	"time"
 
@@ -46,13 +47,7 @@ type Options struct {
 
 // Parse parses command-line arguments without modifying the process environment.
 func Parse(args []string, _ io.Writer) (Options, error) {
-	sep := -1
-	for i, arg := range args {
-		if arg == "--" {
-			sep = i
-			break
-		}
-	}
+	sep := slices.Index(args, "--")
 	flagArgs := args
 	if sep >= 0 {
 		flagArgs = args[:sep]
@@ -71,30 +66,27 @@ func Parse(args []string, _ io.Writer) (Options, error) {
 	if values.version {
 		return Options{action: actionVersion}, nil
 	}
-	if sep < 0 || sep == len(args)-1 {
+
+	// This check must stay after the help/version early returns above:
+	// --help and --version are valid without a -- separator, so checking this first would reject them incorrectly.
+	if sep < 0 || sep+1 >= len(args) {
 		return Options{}, errors.New("a command after -- is required")
 	}
-	if args[sep+1] == "" {
+
+	command := args[sep+1:]
+
+	if command[0] == "" {
 		return Options{}, errors.New("command must not be empty")
 	}
-	d, err := ParseCooldown(values.cooldown)
-	if err != nil {
-		return Options{}, err
-	}
-	if values.timeout <= 0 {
-		return Options{}, errors.New("upstream-timeout must be positive")
-	}
-	if values.timeSource != "combined" && values.timeSource != timeSourceCommit {
-		return Options{}, fmt.Errorf("unsupported time-source %q", values.timeSource)
-	}
+
 	return Options{
-		Cooldown: d, Upstream: values.upstream, TimeSource: values.timeSource,
-		UpstreamTimeout: values.timeout, Verbose: values.verbose, Command: args[sep+1:],
+		Cooldown: values.cooldown, Upstream: values.upstream, TimeSource: values.timeSource,
+		UpstreamTimeout: values.timeout, Verbose: values.verbose, Command: command,
 	}, nil
 }
 
 type flagValues struct {
-	cooldown   string
+	cooldown   time.Duration
 	upstream   string
 	timeSource string
 	timeout    time.Duration
@@ -103,14 +95,83 @@ type flagValues struct {
 	version    bool
 }
 
+// cooldownValue adapts ParseCooldown to the flag.Value interface,
+// so invalid --cooldown values are rejected during fs.Parse itself.
+type cooldownValue time.Duration
+
+func (c *cooldownValue) String() string {
+	if c == nil {
+		return ""
+	}
+
+	return time.Duration(*c).String()
+}
+
+func (c *cooldownValue) Set(s string) error {
+	d, err := ParseCooldown(s)
+	if err != nil {
+		return err
+	}
+
+	*c = cooldownValue(d)
+	return nil
+}
+
+// upstreamTimeoutValue adapts a positive-duration check to the flag.Value
+// interface, so an invalid --upstream-timeout is rejected during fs.Parse itself.
+type upstreamTimeoutValue time.Duration
+
+func (t *upstreamTimeoutValue) String() string {
+	if t == nil {
+		return ""
+	}
+
+	return time.Duration(*t).String()
+}
+
+func (t *upstreamTimeoutValue) Set(s string) error {
+	d, err := time.ParseDuration(s)
+	if err != nil {
+		return fmt.Errorf("invalid upstream-timeout %q: %w", s, err)
+	}
+
+	if d <= 0 {
+		return errors.New("upstream-timeout must be positive")
+	}
+
+	*t = upstreamTimeoutValue(d)
+	return nil
+}
+
+// timeSourceValue adapts the commit/combined enum check to the flag.Value
+// interface, so an unsupported --time-source is rejected during fs.Parse itself.
+type timeSourceValue string
+
+func (t *timeSourceValue) String() string {
+	if t == nil {
+		return ""
+	}
+
+	return string(*t)
+}
+
+func (t *timeSourceValue) Set(s string) error {
+	if s != "combined" && s != timeSourceCommit {
+		return fmt.Errorf("unsupported time-source %q", s)
+	}
+
+	*t = timeSourceValue(s)
+	return nil
+}
+
 func newFlagSet() (*flag.FlagSet, *flagValues) {
-	values := &flagValues{}
+	values := &flagValues{cooldown: 14 * 24 * time.Hour, timeSource: timeSourceCommit, timeout: 30 * time.Second}
 	fs := flag.NewFlagSet("gomod-cooldown", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
-	fs.StringVar(&values.cooldown, "cooldown", "14d", "minimum availability age; accepts Go duration strings plus a 'd' day suffix (e.g. 14d, 168h, 1.5d)")
+	fs.Var((*cooldownValue)(&values.cooldown), "cooldown", "minimum availability age; accepts Go duration strings plus a 'd' day suffix (e.g. 14d, 168h, 1.5d)")
 	fs.StringVar(&values.upstream, "upstream", "https://proxy.golang.org", "upstream GOPROXY URL")
-	fs.StringVar(&values.timeSource, "time-source", "commit", "availability source: commit or combined")
-	fs.DurationVar(&values.timeout, "upstream-timeout", 30*time.Second, "upstream HTTP timeout")
+	fs.Var((*timeSourceValue)(&values.timeSource), "time-source", "availability source: commit or combined")
+	fs.Var((*upstreamTimeoutValue)(&values.timeout), "upstream-timeout", "upstream HTTP timeout")
 	fs.BoolVar(&values.verbose, "verbose", false, "log upstream requests and decisions")
 	fs.BoolVar(&values.help, "help", false, "show this help and exit")
 	fs.BoolVar(&values.help, "h", false, "show this help and exit")
@@ -182,25 +243,31 @@ func dayNumberCanStart(s string, start int) bool {
 	if start == 1 && (s[0] == '+' || s[0] == '-') {
 		return true
 	}
-	previous := s[start-1]
-	return previous == 'd' || previous == 'h' || previous == 'm' || previous == 's'
+
+	return slices.Contains([]uint8{'d', 'h', 'm', 's'}, s[start-1])
+}
+
+func scanDigits(s string, start int) (int, bool) {
+	i := start
+
+	for i < len(s) && s[i] >= '0' && s[i] <= '9' {
+		i++
+	}
+
+	return i, start < i
 }
 
 func scanDecimal(s string, start int) (int, bool) {
-	i := start
-	digits := 0
-	for i < len(s) && s[i] >= '0' && s[i] <= '9' {
-		i++
-		digits++
-	}
+	i, hasDigits := scanDigits(s, start)
+
 	if i < len(s) && s[i] == '.' {
+		var hasFractionDigits bool
 		i++
-		for i < len(s) && s[i] >= '0' && s[i] <= '9' {
-			i++
-			digits++
-		}
+		i, hasFractionDigits = scanDigits(s, i)
+		hasDigits = hasDigits || hasFractionDigits
 	}
-	return i, digits > 0
+
+	return i, hasDigits
 }
 
 func dayNanoseconds(decimal string) (string, error) {

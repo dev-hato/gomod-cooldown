@@ -11,6 +11,7 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -83,8 +84,7 @@ func (e *infoStatusError) Error() string {
 
 func unavailableInfo(err error) bool {
 	var statusErr *infoStatusError
-	return errors.As(err, &statusErr) &&
-		(statusErr.status == http.StatusNotFound || statusErr.status == http.StatusGone)
+	return errors.As(err, &statusErr) && slices.Contains([]int{http.StatusNotFound, http.StatusGone}, statusErr.status)
 }
 
 // VersionInfo is validated metadata returned by a GOPROXY .info endpoint.
@@ -155,10 +155,11 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func moduleFor(rawPath, suffix string) (string, bool) {
-	if !strings.HasSuffix(rawPath, suffix) {
+	trimmed, ok := strings.CutSuffix(rawPath, suffix)
+	if !ok {
 		return "", false
 	}
-	escaped := strings.TrimPrefix(strings.TrimSuffix(rawPath, suffix), "/")
+	escaped := strings.TrimPrefix(trimmed, "/")
 	if escaped == "" {
 		return "", false
 	}
@@ -169,18 +170,30 @@ func moduleFor(rawPath, suffix string) (string, bool) {
 	return path, true
 }
 
-func (s *Server) handleList(w http.ResponseWriter, r *http.Request, path string) {
+// fetchDiscovery fetches the upstream discovery response for path,
+// writing an error or passthrough response to w when the request cannot be handled further.
+// The final return value reports whether the caller should continue processing body and contentType.
+func (s *Server) fetchDiscovery(w http.ResponseWriter, r *http.Request, path string) ([]byte, string, bool) {
 	body, status, contentType, err := s.fetch(r.Context(), r.URL.EscapedPath())
 	if err != nil {
 		s.badGateway(w, err)
-		return
+		return nil, "", false
 	}
 	if status >= http.StatusMultipleChoices && status < http.StatusBadRequest {
 		s.badGateway(w, fmt.Errorf("upstream redirected discovery request for %s", path))
-		return
+		return nil, "", false
 	}
 	if status != http.StatusOK {
 		s.writeUpstream(w, status, contentType, body)
+		return nil, "", false
+	}
+
+	return body, contentType, true
+}
+
+func (s *Server) handleList(w http.ResponseWriter, r *http.Request, path string) {
+	body, _, ok := s.fetchDiscovery(w, r, path)
+	if !ok {
 		return
 	}
 	versions := parseList(body)
@@ -198,17 +211,8 @@ func (s *Server) handleList(w http.ResponseWriter, r *http.Request, path string)
 }
 
 func (s *Server) handleLatest(w http.ResponseWriter, r *http.Request, path string) {
-	body, status, contentType, err := s.fetch(r.Context(), r.URL.EscapedPath())
-	if err != nil {
-		s.badGateway(w, err)
-		return
-	}
-	if status >= http.StatusMultipleChoices && status < http.StatusBadRequest {
-		s.badGateway(w, fmt.Errorf("upstream redirected discovery request for %s", path))
-		return
-	}
-	if status != http.StatusOK {
-		s.writeUpstream(w, status, contentType, body)
+	body, contentType, ok := s.fetchDiscovery(w, r, path)
+	if !ok {
 		return
 	}
 	latest, err := validateInfo(body, "")
@@ -232,14 +236,14 @@ func (s *Server) handleLatest(w http.ResponseWriter, r *http.Request, path strin
 		}
 		latest = tagInfo
 	}
-	ok, err := s.allowed(r.Context(), path, latest)
+	allowed, err := s.allowed(r.Context(), path, latest)
 	if err != nil {
 		s.badGateway(w, err)
 		return
 	}
 	incompatibleTag := strings.HasSuffix(latest.Version, "+incompatible") && !module.IsPseudoVersion(latest.Version)
-	if ok && !incompatibleTag {
-		s.writeUpstream(w, status, contentType, body)
+	if allowed && !incompatibleTag {
+		s.writeUpstream(w, http.StatusOK, contentType, body)
 		return
 	}
 	// A compatible version hidden by the cooldown can otherwise make an older,
@@ -352,12 +356,9 @@ func (s *Server) filter(ctx context.Context, path string, versions []string) ([]
 }
 
 func containsHigherIncompatible(versions []string, compatible string) bool {
-	for _, version := range versions {
-		if higherIncompatible(version, compatible) {
-			return true
-		}
-	}
-	return false
+	return slices.ContainsFunc(versions, func(version string) bool {
+		return higherIncompatible(version, compatible)
+	})
 }
 
 func higherIncompatible(version, compatible string) bool {
@@ -370,7 +371,7 @@ func (s *Server) allowed(ctx context.Context, path string, info VersionInfo) (bo
 		return false, fmt.Errorf("availability time for %s@%s: %w", path, info.Version, err)
 	}
 	cutoff := s.now().Add(-s.cooldown)
-	ok := !a.AvailableAt.After(cutoff)
+	ok := a.AvailableAt.Before(cutoff) || a.AvailableAt.Equal(cutoff)
 	if !ok {
 		first := ""
 		if a.FirstCached != nil {

@@ -15,7 +15,7 @@ Go projectまたはGoogleと提携・承認・スポンサー関係はありま�
 
 ## インストール
 
-`gomod-cooldown` のbuildとinstallにはGo 1.26.6以降が必要です。
+`gomod-cooldown` のbuildとinstallにはGo ${GO_VERSION}以降が必要です。
 
 公開済みの最新stable releaseをinstallします。
 
@@ -187,7 +187,7 @@ pseudo-versionのversion-specific endpointは引き続きダウンロードで�
 
 ## 開発
 
-最低対応toolchainはGo 1.26.6です。CIではGo 1.26.6でcore testを
+最低対応toolchainはGo ${GO_VERSION}です。CIではGo ${GO_VERSION}でcore testを
 実行し、Linux、macOS、WindowsでCLIのtest、build、smoke testを行います。ローカルでの
 全確認手順とcontribution processは [CONTRIBUTING.md](CONTRIBUTING.md) を参照してください。
 

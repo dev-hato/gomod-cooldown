@@ -100,6 +100,28 @@ func TestParseAndEnvironment(t *testing.T) {
 	}
 }
 
+// TestParseInvalidFlagsPrecedeHelpAndVersion locks in a deliberate behavior change:
+// --cooldown, --upstream-timeout, and --time-source are now validated by fs.Parse itself (via flag.Value),
+// so an invalid value for any of them errors out even alongside --help or --version,
+// instead of falling back to showing help/version like before.
+func TestParseInvalidFlagsPrecedeHelpAndVersion(t *testing.T) {
+	var errout bytes.Buffer
+	badArgs := [][]string{
+		{"--cooldown=bogus", "--help"},
+		{"--cooldown=bogus", "--version"},
+		{"--upstream-timeout=0", "--help"},
+		{"--upstream-timeout=0", "--version"},
+		{"--upstream-timeout=bogus", "--help"},
+		{"--time-source=bogus", "--help"},
+		{"--time-source=bogus", "--version"},
+	}
+	for _, args := range badArgs {
+		if o, err := Parse(args, &errout); err == nil {
+			t.Fatalf("Parse(%#v) succeeded with %+v, want error", args, o)
+		}
+	}
+}
+
 func TestRunHelpAndVersion(t *testing.T) {
 	for _, args := range [][]string{{"--help"}, {"-h"}, {"--help", "--", "must-not-run"}} {
 		var stdout, stderr bytes.Buffer

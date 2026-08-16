@@ -303,22 +303,33 @@ func Run(ctx context.Context, args []string, stdin io.Reader, stdout, stderr io.
 	}
 	err = run(ctx, opts, stdin, stdout, stderr)
 	if err != nil {
-		var startErr *childStartError
-		if errors.As(err, &startErr) {
-			_, _ = fmt.Fprintf(stderr, "gomod-cooldown: %v\n", startErr)
-			if startErr.notFound {
-				return 127
-			}
-			return 126
-		}
-		var exit *exec.ExitError
-		if errors.As(err, &exit) {
-			return childExitCode(exit)
-		}
-		_, _ = fmt.Fprintf(stderr, "gomod-cooldown: %v\n", err)
-		return 1
+		return childExitStatus(stderr, err)
 	}
+
 	return 0
+}
+
+func childExitStatus(stderr io.Writer, err error) int {
+	var startErr *childStartError
+
+	if errors.As(err, &startErr) {
+		_, _ = fmt.Fprintf(stderr, "gomod-cooldown: %v\n", startErr)
+
+		if startErr.notFound {
+			return 127
+		}
+
+		return 126
+	}
+
+	var exit *exec.ExitError
+
+	if errors.As(err, &exit) {
+		return childExitCode(exit)
+	}
+
+	_, _ = fmt.Fprintf(stderr, "gomod-cooldown: %v\n", err)
+	return 1
 }
 
 func version() string {
@@ -345,18 +356,9 @@ func run(ctx context.Context, opts Options, stdin io.Reader, stdout, stderr io.W
 	client := &http.Client{Timeout: opts.UpstreamTimeout}
 	started := time.Now()
 	clock := func() time.Time { return started }
-	var source availability.Source
-	if opts.TimeSource == timeSourceCommit {
-		source = availability.CommitTimeSource{}
-	} else {
-		if strings.TrimRight(opts.Upstream, "/") != "https://proxy.golang.org" {
-			return errors.New("time-source=combined requires --upstream=https://proxy.golang.org")
-		}
-		recent, _, err := (goindex.Fetcher{Client: client, Now: clock}).SnapshotForCooldown(ctx, opts.Cooldown)
-		if err != nil {
-			return fmt.Errorf("load complete index snapshot: %w", err)
-		}
-		source = availability.CombinedSource{Recent: recent}
+	source, err := resolveSource(ctx, opts, client, clock)
+	if err != nil {
+		return err
 	}
 	p, err := proxy.New(proxy.Config{
 		Upstream: opts.Upstream,
@@ -382,6 +384,20 @@ func run(ctx context.Context, opts Options, stdin io.Reader, stdout, stderr io.W
 		_ = srv.Shutdown(shutdownCtx)
 	}()
 	return runChild(ctx, opts.Command, "http://"+ln.Addr().String(), stdin, stdout, stderr)
+}
+
+func resolveSource(ctx context.Context, opts Options, client *http.Client, clock func() time.Time) (availability.Source, error) {
+	if opts.TimeSource == timeSourceCommit {
+		return availability.CommitTimeSource{}, nil
+	}
+	if strings.TrimRight(opts.Upstream, "/") != "https://proxy.golang.org" {
+		return nil, errors.New("time-source=combined requires --upstream=https://proxy.golang.org")
+	}
+	recent, _, err := (goindex.Fetcher{Client: client, Now: clock}).SnapshotForCooldown(ctx, opts.Cooldown)
+	if err != nil {
+		return nil, fmt.Errorf("load complete index snapshot: %w", err)
+	}
+	return availability.CombinedSource{Recent: recent}, nil
 }
 
 func runChild(ctx context.Context, command []string, proxyURL string, stdin io.Reader, stdout, stderr io.Writer) error {

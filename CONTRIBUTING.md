@@ -46,7 +46,7 @@ status in `THIRD_PARTY_NOTICES.md`.
 
 - Keep each pull request focused and explain the user-visible behavior it
   changes.
-- Add regression tests for bugfixes and tests for new behavior.
+- Add regression tests for bug fixes and tests for new behavior.
 - Update both `README.md` and `README.ja.md` when changing documented behavior.
 - Treat documented v1 flags, defaults, output streams, exit codes, signal
   handling, and module path as compatibility commitments.

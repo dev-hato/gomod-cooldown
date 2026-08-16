@@ -21,25 +21,27 @@ const signalHelperEnvironment = "GOMOD_COOLDOWN_SIGNAL_HELPER"
 
 func TestRunCannotExecuteCommand(t *testing.T) {
 	command := filepath.Join(t.TempDir(), "not-executable")
+
 	if err := os.WriteFile(command, []byte("not executable\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	var stdout, stderr bytes.Buffer
-	code := Run(context.Background(), []string{"--", command}, nil, &stdout, &stderr)
-	if code != 126 {
-		t.Fatalf("exit=%d stderr=%q", code, stderr.String())
-	}
-	if stdout.Len() != 0 || strings.Count(stderr.String(), "gomod-cooldown:") != 1 || !strings.Contains(stderr.String(), command) {
-		t.Fatalf("stdout=%q stderr=%q", stdout.String(), stderr.String())
-	}
+
+	assertRunFailsWithExitCode126(t, command)
 }
 
 func TestRunExistingCommandWithMissingInterpreter(t *testing.T) {
 	command := filepath.Join(t.TempDir(), "missing-interpreter")
 	contents := "#!/gomod-cooldown/interpreter-that-does-not-exist\n"
+
 	if err := os.WriteFile(command, []byte(contents), 0o700); err != nil {
 		t.Fatal(err)
 	}
+
+	assertRunFailsWithExitCode126(t, command)
+}
+
+func assertRunFailsWithExitCode126(t *testing.T, command string) {
+	t.Helper()
 	var stdout, stderr bytes.Buffer
 	code := Run(context.Background(), []string{"--", command}, nil, &stdout, &stderr)
 	if code != 126 {

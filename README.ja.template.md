@@ -2,7 +2,7 @@
 
 [English](README.md)
 
-`gomod-cooldown`は、新しく利用可能になったGo module versionを、設定したcooldown期間が
+`gomod-cooldown` は、新しく利用可能になったGo module versionを、設定したcooldown期間が
 過ぎるまで依存関係更新の候補から外すCLIです。一時的にloopback限定のGOPROXYを起動し、
 version discoveryだけをフィルタしてからコマンドを実行し、終了時にproxyを停止します。
 
@@ -15,7 +15,7 @@ Go projectまたはGoogleと提携・承認・スポンサー関係はありま�
 
 ## インストール
 
-`gomod-cooldown`のbuildとinstallにはGo ${GO_VERSION}以降が必要です。
+`gomod-cooldown` のbuildとinstallにはGo ${GO_VERSION}以降が必要です。
 
 公開済みの最新stable releaseをinstallします。
 
@@ -23,11 +23,11 @@ Go projectまたはGoogleと提携・承認・スポンサー関係はありま�
 go install github.com/dev-hato/gomod-cooldown/cmd/gomod-cooldown@latest
 ```
 
-再現可能な環境にするには、`latest`を使いたい公開済みのexact versionに置き換えてください。
-`@latest`は最新のtag付きstable releaseを選び、stable releaseが1つもない場合だけ
+再現可能な環境にするには、`latest` を使いたい公開済みのexact versionに置き換えてください。
+`@latest` は最新のtag付きstable releaseを選び、stable releaseが1つもない場合だけ
 pre-releaseを候補にします。
 
-チェックアウトしたソースからは、`go build ./cmd/gomod-cooldown`でbuildできます。
+チェックアウトしたソースからは、`go build ./cmd/gomod-cooldown` でbuildできます。
 
 ## 使い方
 
@@ -37,34 +37,34 @@ gomod-cooldown --cooldown=14d -- go get -u -t ./...
 go mod tidy
 ```
 
-更新対象moduleのrootで実行してください。`-t`はtestが使う依存関係も更新します。testの
-依存関係を更新しない場合は、`-t`を外して`go get -u ./...`を使います。更新後は
-`go.mod`と`go.sum`の差分を確認し、そのmoduleのtestを実行してください。
+更新対象moduleのrootで実行してください。`-t` はtestが使う依存関係も更新します。testの
+依存関係を更新しない場合は、`-t` を外して `go get -u ./...` を使います。更新後は
+`go.mod` と `go.sum` の差分を確認し、そのmoduleのtestを実行してください。
 
-このworkflowでは`go get -u all`を避けてください。`all`は、更新前のpackage graphに
+このworkflowでは `go get -u all` を避けてください。`all` は、更新前のpackage graphに
 ある依存module内のinternal packageも、提供moduleを更新しながら対象として保持することが
 あります。新しいmoduleでそのinternal packageが削除されていることがあります。
-その場合、main moduleが直接importしていなくても`does not contain package`で失敗します。
-`./...`に限定すると、main module内のpackageを起点に更新できます。
+その場合、main moduleが直接importしていなくても `does not contain package` で失敗します。
+`./...` に限定すると、main module内のpackageを起点に更新できます。
 
-構文は`gomod-cooldown [flags] -- command [args...]`です。コマンドはshellを経由せず、
-元のargvのまま実行されます。子プロセスの`GOPROXY`には一時ローカルURLだけが設定
-され、呼び出し元の環境変数や`go env`設定は変更されません。
+構文は `gomod-cooldown [flags] -- command [args...]` です。コマンドはshellを経由せず、
+元のargvのまま実行されます。子プロセスの `GOPROXY` には一時ローカルURLだけが設定
+され、呼び出し元の環境変数や `go env` 設定は変更されません。
 
 フラグは次のとおりです。
 
-- `--cooldown=14d`: Goのduration形式に加えて、`d`を厳密に24時間として受け付けます。
-  例： `168h`、`1.5d`、`7d`、`14d12h`。`1.5d`は36時間です。正の値が必要です。
+- `--cooldown=14d`: Goのduration形式に加えて、`d` を厳密に24時間として受け付けます。
+  例： `168h`、`1.5d`、`7d`、`14d12h`。`1.5d` は36時間です。正の値が必要です。
 - `--upstream=https://proxy.golang.org`: 単一の固定upstream GOPROXYを指定します。
-- `--time-source=commit`: 既定値です。`.info.Time`だけを使い、通常のGo commandと
-  同じくmodule単位のdiscovery requestだけで完了します。`combined`はindex timestampも
+- `--time-source=commit`: 既定値です。`.info.Time` だけを使い、通常のGo commandと
+  同じくmodule単位のdiscovery requestだけで完了します。`combined` はindex timestampも
   使う、高コストの明示opt-inモードです。
 - `--upstream-timeout=30s`: upstream HTTP requestのタイムアウトです。
 - `--verbose`: upstream requestと判定の詳細を出力します。
 
-`--help`と`-h`は`--`なしでcommand helpをstdoutへ表示し、正常終了します。
-`--version`はstdoutへ`gomod-cooldown <version>`を表示します。module version metadataが
-埋め込まれていないbuildではversionは`devel`です。
+`--help` と `-h` は `--` なしでcommand helpをstdoutへ表示し、正常終了します。
+`--version` はstdoutへ `gomod-cooldown <version>` を表示します。module version metadataが
+埋め込まれていないbuildではversionは `devel` です。
 
 次のexit statusはv1 CLI contractの一部です。
 
@@ -77,7 +77,7 @@ go mod tidy
   子commandとその子孫を専用process groupで実行します。wrapperに届いたSIGINTとSIGTERMは、
   そのgroupへ1回だけforwardします。対話的なcontrolling terminalでは、実行中だけ
   子process groupがforegroundになります。そのため、terminal inputとterminal由来の
-  SIGINT/SIGTERMは通常どおり動作します。signal終了は`128 + signal`（SIGINTは`130`、
+  SIGINT/SIGTERMは通常どおり動作します。signal終了は `128 + signal`（SIGINTは`130`、
   SIGTERMは`143`）として返します。
 
 helpとversionの出力先はstdoutです。wrapperの診断はstderrへ出力し、子processは呼び出し元の
@@ -93,50 +93,50 @@ stdin、stdout、stderrを引き継ぎます。
 ```
 
 `.info`、`.mod`、`.zip`を含むversion-specific endpointと、その他のGOPROXY endpointは
-すべて指定upstreamへ透過します。そのため、`go get example.com/mod@v1.2.3`のような
-明示指定や、`go.mod`にすでに記録されたversionはcooldown中でもダウンロードできます。
+すべて指定upstreamへ透過します。そのため、`go get example.com/mod@v1.2.3` のような
+明示指定や、`go.mod` にすでに記録されたversionはcooldown中でもダウンロードできます。
 
-upstreamの`@v/list`に含まれるversionの`.info` endpointが404か410を返すことがあります。
+upstreamの `@v/list` に含まれるversionの `.info` endpointが404か410を返すことがあります。
 その場合、その取得不能なversionだけを使用不能としてdiscoveryから除外します。この
 negative resultは同じCLI実行が終わるまでcacheします。403、429、5xx、通信エラー、不正
-または整合しないmetadataなど、その他の`.info`失敗は引き続きdiscovery全体を502で
+または整合しないmetadataなど、その他の `.info` 失敗は引き続きdiscovery全体を502で
 fail closedにします。
 
 また、cooldownはraw listにある取得可能な最高compatible versionを除外することが
-あります。その場合でも、それだけを理由に、より高い`+incompatible` versionを
+あります。その場合でも、それだけを理由に、より高い `+incompatible` versionを
 暗黙のdiscoveryで選びません。除外された
-compatible versionの`.mod`が実際のmodule-awareなファイルなら、それより高い
-`+incompatible`候補も除外します。`module <path>`だけで構成されたsyntheticなlegacy
-`.mod`はmodule-awareの根拠とみなさないため、その場合は候補を残します。exact指定または
-pin済みの`+incompatible` versionは、version-specific endpointの透過によって引き続き
+compatible versionの `.mod` が実際のmodule-awareなファイルなら、それより高い
+`+incompatible` 候補も除外します。`module <path>` だけで構成されたsyntheticなlegacy
+`.mod` はmodule-awareの根拠とみなさないため、その場合は候補を残します。exact指定または
+pin済みの `+incompatible` versionは、version-specific endpointの透過によって引き続き
 ダウンロードできます。
 
 GOPROXYのdiscovery requestからは、元のversion queryや現在選択中のversionを判別できません。
-そのため、この保護によって`@v2`のようなversion-prefix queryも暗黙のdiscoveryから
+そのため、この保護によって `@v2` のようなversion-prefix queryも暗黙のdiscoveryから
 見えなくなる場合があります。この区別が必要な場合はexact versionを指定してください。
 
-子プロセスの`GOPROXY`に`https://proxy.golang.org,direct`などのfallbackは追加しません。
+子プロセスの `GOPROXY` に `https://proxy.golang.org,direct` などのfallbackは追加しません。
 discovery endpointが返す404によって、後段proxyで迂回されないようにするためです。
 
-version判定用に検証済みの`.info` metadataも、1回のCLI実行中だけmemoryにcacheして
+version判定用に検証済みの `.info` metadataも、1回のCLI実行中だけmemoryにcacheして
 再利用します。すべてのcacheは終了時に破棄され、次回起動には引き継ぎません。変化し得る
-`@v/list`と`@latest`自体はcacheせず、requestごとにupstreamから取得します。
+`@v/list` と `@latest` 自体はcacheせず、requestごとにupstreamから取得します。
 
 ## availability time
 
-`.info.Time`はcommit timeであり、公開日時ではありません。新しいtagが古いcommitを
+`.info.Time` はcommit timeであり、公開日時ではありません。新しいtagが古いcommitを
 指すことがあるためです。既定値がcommit modeなのは、module単位のproxy requestだけで
 判定でき、対話的なCLI利用でも実用的だからです。
 
-公式の`index.golang.org` feedは、module versionが`proxy.golang.org`へ最初にcache
+公式の `index.golang.org` feedは、module versionが `proxy.golang.org` へ最初にcache
 された時刻を含みます。このfirst-cached timeはavailability timeとして扱いますが、
 厳密なtag公開日時ではありません。
 
-`--time-source=combined`は明示opt-inです。indexにはmodule単位のlookup APIがありません。
-そのため起動時に、cutoff直前から現在までの時系列global feedを`since`と`limit=2000`で
+`--time-source=combined` は明示opt-inです。indexにはmodule単位のlookup APIがありません。
+そのため起動時に、cutoff直前から現在までの時系列global feedを `since` と `limit=2000` で
 最終short pageまで読み切ります。cooldownの期間が長い場合、処理に時間がかかります。不正
 record、HTTP失敗、timeout、cursorの進行停止はfail closedで扱い、commit timeだけへ黙って
-fallbackしません。このモードでは正確に`https://proxy.golang.org`をupstreamとして指定
+fallbackしません。このモードでは正確に `https://proxy.golang.org` をupstreamとして指定
 する必要があります。
 
 候補versionごとの判定は次のとおりです。
@@ -151,10 +151,10 @@ availableAt <= cutoff なら許可
 あったものとして扱います。indexとproxyの反映タイミングにはraceがあり得るため、
 これは厳密なセキュリティ境界ではありません。
 
-upstreamの`@latest`が新しすぎるときは、`@v/list`をフィルタし、許可されたtagged
+upstreamの `@latest` が新しすぎるときは、`@v/list` をフィルタし、許可されたtagged
 releaseのうちsemantic versionがもっとも高いものを返します。releaseがなければもっとも高い
 pre-releaseを返します。pseudo-versionは新たに作りません。そのため、古い候補が
-pseudo-versionだけのmoduleでは`@latest`が404になることがあります。一方で、pin済み
+pseudo-versionだけのmoduleでは `@latest` が404になることがあります。一方で、pin済み
 pseudo-versionのversion-specific endpointは引き続きダウンロードできます。
 
 ## 注意点とトラブルシューティング
@@ -171,13 +171,13 @@ pseudo-versionのversion-specific endpointは引き続きダウンロードで�
 - 親moduleと新しく分割されたnested moduleの両方に同じpackageが含まれるために起きる
   ambiguous importは、このツールでは解決できません。古いmodule requirementを削除するか、
   意図したmodule versionを選んでから再実行してください。
-- `go get example.com/mod@v1.2.3`のようなexact requestは、version-specific proxy
-  endpointを使います。`go.mod`ですでにpinされたversionも同様です。そのため、cooldownでは
+- `go get example.com/mod@v1.2.3` のようなexact requestは、version-specific proxy
+  endpointを使います。 `go.mod` ですでにpinされたversionも同様です。そのため、cooldownでは
   保留されません。これは明示的なescape hatchとして意図した挙動です。
-- `GOPRIVATE`や`GONOPROXY`によってGo commandがこのproxyを迂回することがあります。
+- `GOPRIVATE` や `GONOPROXY` によってGo commandがこのproxyを迂回することがあります。
   これはGo標準の挙動であり、このツールはprivate moduleの取得を制御しません。
 - 対応するupstream GOPROXYは1つだけです。子プロセスにはローカルproxy URLだけを渡し、
-  `,direct`や別proxyへのfallbackは追加しません。
+  `,direct` や別proxyへのfallbackは追加しません。
 - module cacheに既存データがあれば、Go commandはnetwork requestを行わない場合が
   あります。proxyの挙動を確認する際はfresh cacheを使ってください。
 - 502はdiscovery metadataまたは完全なindex snapshotを検証できなかったことを表します。
@@ -190,7 +190,7 @@ pseudo-versionのversion-specific endpointは引き続きダウンロードで�
 
 最低対応toolchainはGo ${GO_VERSION}です。CIではGo ${GO_VERSION}でcore testを
 実行し、Linux、macOS、WindowsでCLIのtest、build、smoke testを行います。ローカルでの
-全確認手順とcontribution processは[CONTRIBUTING.md](CONTRIBUTING.md)を参照してください。
+全確認手順とcontribution processは [CONTRIBUTING.md](CONTRIBUTING.md) を参照してください。
 
 ```sh
 gofmt -w cmd internal
@@ -202,11 +202,11 @@ golangci-lint run
 golangci-lint fmt
 ```
 
-テストは`httptest.Server`、inject可能なHTTP clientとclockを使うため、外部networkに
+テストは `httptest.Server`、inject可能なHTTP clientとclockを使うため、外部networkに
 依存しません。E2Eでは本物のGo commandをローカルfake GOPROXYに対して実行します。
-また、Prometheus、Helm、Caddyの固定commitからbyte-for-byteで取得した`go.mod`も
+また、Prometheus、Helm、Caddyの固定commitからbyte-for-byteで取得した `go.mod` も
 検証します。fixtureの出典は
-[`internal/cli/testdata/large-modules`](internal/cli/testdata/large-modules)に記録しています。
+[`internal/cli/testdata/large-modules`](internal/cli/testdata/large-modules) に記録しています。
 GitHub Actionsはtest、race検出、vetを実行します。さらに、`govulncheck`、version固定
 した`golangci-lint`、cross-platform build smoke testも実行します。リポジトリ内のPRでは別workflowが
 `gofmt`/`goimports`を実行し、安全な差分があれば整形用PRを作成・更新します。
@@ -215,18 +215,18 @@ GitHub Actionsはtest、race検出、vetを実行します。さらに、`govuln
 
 v1の互換性contractには、flag名と意味、既定値、stdout/stderrの挙動が含まれます。さらに、
 文書化したexit code、上記のplatform別signal handlingも含まれます。加えて、
-`github.com/dev-hato/gomod-cooldown`のinstall/module pathも含まれます。filteringの挙動を
+`github.com/dev-hato/gomod-cooldown` のinstall/module pathも含まれます。filteringの挙動を
 文書化済みpolicyに戻す修正patchによって、個別versionの判定結果が
-変わることはあります。その変更は[CHANGELOG.md](CHANGELOG.md)に記録します。
+変わることはあります。その変更は [CHANGELOG.md](CHANGELOG.md) に記録します。
 
 ## ライセンスと第三者通知
 
-このプロジェクトは[MIT License](LICENSE)で提供されます。同梱する依存関係とtest
+このプロジェクトは [MIT License](LICENSE) で提供されます。同梱する依存関係とtest
 fixtureにはそれぞれのライセンスが引き続き適用されます。詳細は
-[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)を参照してください。
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) を参照してください。
 
 ## Inspiration
 
-このプロジェクトは[imjasonh/go-cooldown](https://github.com/imjasonh/go-cooldown)に
+このプロジェクトは [imjasonh/go-cooldown](https://github.com/imjasonh/go-cooldown) に
 着想を得ています。明示指定・pin済みversionをダウンロード可能に保ちながら、
 version discovery endpointだけをフィルタする点が異なります。

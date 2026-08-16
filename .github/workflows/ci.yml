@@ -11,15 +11,48 @@ concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 jobs:
+  go-versions:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      matrix: ${{ steps.get-matrix.outputs.versions }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Get stable version
+        id: get-stable-version
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
+        with:
+          go-version: stable
+          cache: false
+      - name: Get matrix
+        id: get-matrix
+        env:
+          STABLE_VERSION: ${{ steps.get-stable-version.outputs.go-version }}
+        run: |
+          mod_version=$(awk '/^go /{print $2; exit}' go.mod)
+          oldest=$(printf '%s\n%s\n' "${mod_version}" "${STABLE_VERSION}" | sort -V | head -n1)
+
+          # actions/go-versions' "stable" manifest can lag behind go.dev's actual latest patch release.
+          # Only add "stable" to the matrix when it is strictly newer than go.mod's version,
+          # or actions/setup-go would fail go.mod's minimum-version check.
+          if [ "${oldest}" = "${mod_version}" ] && [ "${STABLE_VERSION}" != "${mod_version}" ]; then
+            versions="[\"${mod_version}\", \"stable\"]"
+          else
+            versions="[\"${mod_version}\"]"
+          fi
+
+          echo "versions=${versions}" >> "$GITHUB_OUTPUT"
   unit:
     name: unit (Go ${{ matrix.go-version }})
+    needs: go-versions
     runs-on: ubuntu-latest
     timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
-        go-version:
-          - 1.26.6
+        go-version: ${{ fromJson(needs.go-versions.outputs.matrix) }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

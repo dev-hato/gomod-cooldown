@@ -1,5 +1,5 @@
 {
-	"$schema": "https://docs.renovatebot.com/renovate-schema.json",
-	"extends": ["local>dev-hato/renovate-config"],
-	"ignorePaths": ["internal/cli/testdata/large-modules/**"]
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["local>dev-hato/renovate-config"],
+  "ignorePaths": ["internal/cli/testdata/large-modules/**"]
 }

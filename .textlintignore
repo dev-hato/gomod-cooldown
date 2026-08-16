@@ -1,0 +1,13 @@
+# This repo's canonical docs are English; only the README has a Japanese
+# translation. The ja-technical-writing preset in .textlintrc (sentence
+# length, comma count, particle repetition, etc.) is written for Japanese
+# prose and misfires on English text, so English-only docs are excluded
+# here rather than linted with rules that don't apply to their language.
+CHANGELOG.md
+CONTRIBUTING.md
+README.md
+README.template.md
+SECURITY.md
+THIRD_PARTY_NOTICES.md
+.github/RELEASE_CHECKLIST.md
+internal/cli/testdata/large-modules/README.md

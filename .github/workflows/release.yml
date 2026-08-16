@@ -69,6 +69,7 @@ jobs:
             done
           fi
 
+          # shellcheck disable=SC2016
           release_id="$(
             gh api graphql \
               -f owner="${GITHUB_REPOSITORY_OWNER}" \

@@ -57,6 +57,7 @@ jobs:
         run: |
           for name in README README.ja
           do
+            # shellcheck disable=SC2016
             envsubst '$GO_VERSION' < "$name.template.md" > "$name.md"
           done
       - run: npm install

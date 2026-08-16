@@ -48,7 +48,7 @@ provide the mutation protection without storing a signing key in Actions.
   Omit the leading `v` from the section and link labels, but use the exact
   requested `v` tag in the comparison URL.
 - For the release candidate, keep the exact RC install command as the runnable
-  readme example. Before the stable release, update the transitional readme
+  README example. Before the stable release, update the transitional README
   wording so `@v1.0.0` is presented as already published.
 - Copy the full 40-character SHA shown for the successful `main` CI run.
 - Confirm `LICENSE`, `THIRD_PARTY_NOTICES.md`, and

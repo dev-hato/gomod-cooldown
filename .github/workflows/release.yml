@@ -1,4 +1,7 @@
 name: Release
+# checkov:skip=CKV_GHA_7: tag/target_sha only select which already-validated commit to release;
+# both are strictly checked (40-char hex SHA, canonical semver tag)
+# and target_sha is required to match main before any output is produced, so they cannot influence the build.
 on:
   workflow_dispatch:
     inputs:

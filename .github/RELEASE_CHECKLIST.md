@@ -22,6 +22,7 @@ provide the mutation protection without storing a signing key in Actions.
   maintainer can approve releases; enabling it now would deadlock the workflow.
   For the same reason, do not add a `CODEOWNERS` file that names only the pull
   request author while code-owner review is required on `main`.
+
 - Keep the `test`, `lint`, and `format` checks required on `main`.
 - Keep immutable releases enabled.
 - Apply or verify the checked-in

@@ -753,7 +753,7 @@ func copyHeaders(dst, src http.Header) {
 
 func isHopHeader(key string) bool {
 	switch strings.ToLower(key) {
-	case "connection", "keep-alive", "proxy-authenticate", "proxy-authorization", "te", "trailer", "transfer-encoding", "upgrade":
+	case "connection", "keep-alive", "proxy-authenticate", "proxy-authorization", "te", "trailer", "transfer-encoding", "upgrade": // codespell:ignore te
 		return true
 	default:
 		return false

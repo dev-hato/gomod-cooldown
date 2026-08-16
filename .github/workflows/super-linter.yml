@@ -61,6 +61,12 @@ jobs:
           # This is an upstream limitation with no fix planned (super-linter/super-linter#6294).
           # Go is already linted properly (with `./...`) by the dedicated `lint` job in ci.yml, so skip it here.
           VALIDATE_GO: false
+          # VALIDATE_GO_MODULES runs golangci-lint against every directory containing a go.mod,
+          # including internal/cli/testdata/large-modules/* (go.mod/go.sum-only fixtures with no .go files)
+          # and the repo root (whose code lives in subpackages, not the root package),
+          # both of which fail with "no go files to analyze".
+          # go vet/go test already cover module correctness in ci.yml, so skip this too.
+          VALIDATE_GO_MODULES: false
           VALIDATE_BIOME_FORMAT: false
 concurrency:
   group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}

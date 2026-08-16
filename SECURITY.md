@@ -6,7 +6,7 @@ Security fixes are made on the latest stable release in the supported series.
 Users of an older release should upgrade to receive a fix.
 
 | Version                    | Supported                     |
-|----------------------------|-------------------------------|
+| -------------------------- | ----------------------------- |
 | Latest stable v1.x release | Yes, after v1.0.0 is released |
 | Earlier v1.x releases      | Upgrade to latest             |
 | Latest v0.x release        | Until v1.0.0 is released      |

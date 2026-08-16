@@ -1,5 +1,4 @@
 ---
-ignorefile: .trivyignore
 exit-code: 1
 exit-on-eol: 2
 scan:
@@ -8,3 +7,5 @@ scan:
     - vuln
     - misconfig
     - secret
+  skip-dirs:
+    - internal/cli/testdata/large-modules

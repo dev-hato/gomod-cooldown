@@ -87,7 +87,7 @@ stdin、stdout、stderrを引き継ぎます。
 
 フィルタするのは、次のversion discovery endpointだけです。
 
-```
+```text
 /<module>/@v/list
 /<module>/@latest
 ```
@@ -140,7 +140,7 @@ HTTP失敗、timeout、cursorの進行停止はfail closedで扱い、commit tim
 
 候補versionごとの判定は次のとおりです。
 
-```
+```text
 availableAt = max(commitTime, firstCachedTime)
 cutoff = now - cooldown
 availableAt <= cutoff なら許可

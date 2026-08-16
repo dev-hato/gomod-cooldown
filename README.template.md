@@ -25,7 +25,7 @@ go install github.com/dev-hato/gomod-cooldown/cmd/gomod-cooldown@latest
 
 For a reproducible setup, replace `latest` with the exact published version you
 want to use. `@latest` selects the newest tagged stable release; it considers a
-pre-release only when no stable release is available.
+prerelease only when no stable release is available.
 
 Alternatively, build the checked-out source with
 `go build ./cmd/gomod-cooldown`.
@@ -163,7 +163,7 @@ strict security boundary.
 
 If an upstream `@latest` is too recent, the wrapper filters `@v/list` and
 returns the highest eligible tagged release; if no release remains it chooses
-the highest tagged pre-release. It does not invent pseudo-versions. A module
+the highest tagged prerelease. It does not invent pseudo-versions. A module
 whose only usable older history is pseudo-versions may therefore return 404 for
 `@latest`, while a pinned pseudo-version remains downloadable via its
 version-specific endpoints.

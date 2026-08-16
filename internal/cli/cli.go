@@ -251,21 +251,27 @@ func dayNumberCanStart(s string, start int) bool {
 	return slices.Contains([]uint8{'d', 'h', 'm', 's'}, s[start-1])
 }
 
-func scanDecimal(s string, start int) (int, bool) {
+func scanDigits(s string, start int) (int, bool) {
 	i := start
-	digits := 0
+
 	for i < len(s) && s[i] >= '0' && s[i] <= '9' {
 		i++
-		digits++
 	}
+
+	return i, start < i
+}
+
+func scanDecimal(s string, start int) (int, bool) {
+	i, hasDigits := scanDigits(s, start)
+
 	if i < len(s) && s[i] == '.' {
+		var hasFractionDigits bool
 		i++
-		for i < len(s) && s[i] >= '0' && s[i] <= '9' {
-			i++
-			digits++
-		}
+		i, hasFractionDigits = scanDigits(s, i)
+		hasDigits = hasDigits || hasFractionDigits
 	}
-	return i, digits > 0
+
+	return i, hasDigits
 }
 
 func dayNanoseconds(decimal string) (string, error) {

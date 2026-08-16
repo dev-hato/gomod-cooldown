@@ -68,6 +68,13 @@ jobs:
           # go vet/go test already cover module correctness in ci.yml, so skip this too.
           VALIDATE_GO_MODULES: false
           VALIDATE_BIOME_FORMAT: false
+          # jscpd flags expected duplication this repo can't avoid:
+          # README.md/README.ja.md are intentionally generated verbatim from README.template.md/README.ja.template.md,
+          # CI jobs repeat the same checkout/setup-go/setup-takumi-guard-golang steps,
+          # and table-driven Go tests share httptest boilerplate by convention.
+          # golangci-lint's dupl linter already covers Go duplication under this project's own policy (.golangci.yml),
+          # so skip jscpd entirely.
+          VALIDATE_JSCPD: false
 concurrency:
   group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: true

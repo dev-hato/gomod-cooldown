@@ -78,24 +78,15 @@ func Parse(args []string, _ io.Writer) (Options, error) {
 	if command[0] == "" {
 		return Options{}, errors.New("command must not be empty")
 	}
-	d, err := ParseCooldown(values.cooldown)
-	if err != nil {
-		return Options{}, err
-	}
-	if values.timeout <= 0 {
-		return Options{}, errors.New("upstream-timeout must be positive")
-	}
-	if values.timeSource != "combined" && values.timeSource != timeSourceCommit {
-		return Options{}, fmt.Errorf("unsupported time-source %q", values.timeSource)
-	}
+
 	return Options{
-		Cooldown: d, Upstream: values.upstream, TimeSource: values.timeSource,
+		Cooldown: values.cooldown, Upstream: values.upstream, TimeSource: values.timeSource,
 		UpstreamTimeout: values.timeout, Verbose: values.verbose, Command: command,
 	}, nil
 }
 
 type flagValues struct {
-	cooldown   string
+	cooldown   time.Duration
 	upstream   string
 	timeSource string
 	timeout    time.Duration
@@ -104,14 +95,83 @@ type flagValues struct {
 	version    bool
 }
 
+// cooldownValue adapts ParseCooldown to the flag.Value interface,
+// so invalid --cooldown values are rejected during fs.Parse itself.
+type cooldownValue time.Duration
+
+func (c *cooldownValue) String() string {
+	if c == nil {
+		return ""
+	}
+
+	return time.Duration(*c).String()
+}
+
+func (c *cooldownValue) Set(s string) error {
+	d, err := ParseCooldown(s)
+	if err != nil {
+		return err
+	}
+
+	*c = cooldownValue(d)
+	return nil
+}
+
+// upstreamTimeoutValue adapts a positive-duration check to the flag.Value
+// interface, so an invalid --upstream-timeout is rejected during fs.Parse itself.
+type upstreamTimeoutValue time.Duration
+
+func (t *upstreamTimeoutValue) String() string {
+	if t == nil {
+		return ""
+	}
+
+	return time.Duration(*t).String()
+}
+
+func (t *upstreamTimeoutValue) Set(s string) error {
+	d, err := time.ParseDuration(s)
+	if err != nil {
+		return fmt.Errorf("invalid upstream-timeout %q: %w", s, err)
+	}
+
+	if d <= 0 {
+		return errors.New("upstream-timeout must be positive")
+	}
+
+	*t = upstreamTimeoutValue(d)
+	return nil
+}
+
+// timeSourceValue adapts the commit/combined enum check to the flag.Value
+// interface, so an unsupported --time-source is rejected during fs.Parse itself.
+type timeSourceValue string
+
+func (t *timeSourceValue) String() string {
+	if t == nil {
+		return ""
+	}
+
+	return string(*t)
+}
+
+func (t *timeSourceValue) Set(s string) error {
+	if s != "combined" && s != timeSourceCommit {
+		return fmt.Errorf("unsupported time-source %q", s)
+	}
+
+	*t = timeSourceValue(s)
+	return nil
+}
+
 func newFlagSet() (*flag.FlagSet, *flagValues) {
-	values := &flagValues{}
+	values := &flagValues{cooldown: 14 * 24 * time.Hour, timeSource: timeSourceCommit, timeout: 30 * time.Second}
 	fs := flag.NewFlagSet("gomod-cooldown", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
-	fs.StringVar(&values.cooldown, "cooldown", "14d", "minimum availability age")
+	fs.Var((*cooldownValue)(&values.cooldown), "cooldown", "minimum availability age")
 	fs.StringVar(&values.upstream, "upstream", "https://proxy.golang.org", "upstream GOPROXY URL")
-	fs.StringVar(&values.timeSource, "time-source", "commit", "availability source: commit (default) or combined")
-	fs.DurationVar(&values.timeout, "upstream-timeout", 30*time.Second, "upstream HTTP timeout")
+	fs.Var((*timeSourceValue)(&values.timeSource), "time-source", "availability source: commit (default) or combined")
+	fs.Var((*upstreamTimeoutValue)(&values.timeout), "upstream-timeout", "upstream HTTP timeout")
 	fs.BoolVar(&values.verbose, "verbose", false, "log upstream requests and decisions")
 	fs.BoolVar(&values.help, "help", false, "show this help and exit")
 	fs.BoolVar(&values.help, "h", false, "show this help and exit")

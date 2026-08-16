@@ -93,7 +93,7 @@ child process inherits the caller's stdin, stdout, and stderr.
 
 Only these version-discovery endpoints are filtered:
 
-```
+```text
 /<module>/@v/list
 /<module>/@latest
 ```
@@ -151,7 +151,7 @@ official `https://proxy.golang.org` upstream.
 
 For each discovery candidate:
 
-```
+```text
 availableAt = max(commitTime, firstCachedTime)
 cutoff = now - cooldown
 allow when availableAt <= cutoff

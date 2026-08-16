@@ -25,7 +25,7 @@ go install github.com/dev-hato/gomod-cooldown/cmd/gomod-cooldown@latest
 
 再現可能な環境にするには、`latest` を使いたい公開済みのexact versionに置き換えてください。
 `@latest` は最新のtag付きstable releaseを選び、stable releaseが1つもない場合だけ
-pre-releaseを候補にします。
+prereleaseを候補にします。
 
 チェックアウトしたソースからは、`go build ./cmd/gomod-cooldown` でbuildできます。
 
@@ -153,7 +153,7 @@ availableAt <= cutoff なら許可
 
 upstreamの `@latest` が新しすぎるときは、`@v/list` をフィルタし、許可されたtagged
 releaseのうちsemantic versionがもっとも高いものを返します。releaseがなければもっとも高い
-pre-releaseを返します。pseudo-versionは新たに作りません。そのため、古い候補が
+prereleaseを返します。pseudo-versionは新たに作りません。そのため、古い候補が
 pseudo-versionだけのmoduleでは `@latest` が404になることがあります。一方で、pin済み
 pseudo-versionのversion-specific endpointは引き続きダウンロードできます。
 

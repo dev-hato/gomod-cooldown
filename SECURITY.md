@@ -10,7 +10,7 @@ Users of an older release should upgrade to receive a fix.
 | Latest stable v1.x release | Yes, after v1.0.0 is released |
 | Earlier v1.x releases      | Upgrade to latest             |
 | Latest v0.x release        | Until v1.0.0 is released      |
-| Pre-releases               | Best effort                   |
+| Prereleases                | Best effort                   |
 | Earlier v0.x releases      | No                            |
 
 ## Reporting a vulnerability

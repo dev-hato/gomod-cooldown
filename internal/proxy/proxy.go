@@ -78,6 +78,9 @@ type infoStatusError struct {
 	status  int
 }
 
+// errFallbackToList signals that the caller must fall back to @v/list instead.
+var errFallbackToList = errors.New("fall back to @v/list")
+
 func (e *infoStatusError) Error() string {
 	return fmt.Sprintf("upstream .info for %s@%s returned %d", e.path, e.version, e.status)
 }
@@ -220,22 +223,20 @@ func (s *Server) handleLatest(w http.ResponseWriter, r *http.Request, path strin
 		s.badGateway(w, fmt.Errorf("invalid upstream latest for %s: %w", path, err))
 		return
 	}
-	if !module.IsPseudoVersion(latest.Version) {
-		tagInfo, err := s.info(r.Context(), path, latest.Version)
-		if err != nil {
-			if unavailableInfo(err) {
-				s.handleLatestFallback(w, r, path)
-				return
-			}
-			s.badGateway(w, err)
+
+	resolved, err := s.resolveLatestTag(r.Context(), path, latest)
+	if err != nil {
+		if errors.Is(err, errFallbackToList) {
+			s.handleLatestFallback(w, r, path)
 			return
 		}
-		if !tagInfo.Time.Equal(latest.Time) {
-			s.badGateway(w, fmt.Errorf("inconsistent upstream latest for %s@%s", path, latest.Version))
-			return
-		}
-		latest = tagInfo
+
+		s.badGateway(w, err)
+		return
 	}
+
+	latest = resolved
+
 	allowed, err := s.allowed(r.Context(), path, latest)
 	if err != nil {
 		s.badGateway(w, err)
@@ -251,6 +252,28 @@ func (s *Server) handleLatest(w http.ResponseWriter, r *http.Request, path strin
 	// Pseudo-versions are absent from @v/list and must continue through @latest.
 	// Reconcile such tags with the filtered list and the module-awareness check.
 	s.handleLatestFallback(w, r, path)
+}
+
+// resolveLatestTag reconciles a pseudo-version-free @latest with its tagged .info.
+func (s *Server) resolveLatestTag(ctx context.Context, path string, latest VersionInfo) (VersionInfo, error) {
+	if module.IsPseudoVersion(latest.Version) {
+		return latest, nil
+	}
+
+	tagInfo, err := s.info(ctx, path, latest.Version)
+	if err != nil {
+		if unavailableInfo(err) {
+			return VersionInfo{}, errFallbackToList
+		}
+
+		return VersionInfo{}, err
+	}
+
+	if !tagInfo.Time.Equal(latest.Time) {
+		return VersionInfo{}, fmt.Errorf("inconsistent upstream latest for %s@%s", path, latest.Version)
+	}
+
+	return tagInfo, nil
 }
 
 func (s *Server) handleLatestFallback(w http.ResponseWriter, r *http.Request, path string) {
@@ -335,24 +358,35 @@ func (s *Server) filter(ctx context.Context, path string, versions []string) ([]
 		}
 	}
 
-	if latestCompatibleInCooldown && containsHigherIncompatible(kept, latestCompatible) {
-		aware, err := s.moduleAware(ctx, path, latestCompatible)
-		if err != nil {
-			return nil, err
-		}
-		if aware {
-			filtered := kept[:0]
-			for _, version := range kept {
-				if higherIncompatible(version, latestCompatible) {
-					s.logger.Printf("excluded module=%s version=%s reason=module-aware-compatible-version compatible_version=%s", path, version, latestCompatible)
-					continue
-				}
-				filtered = append(filtered, version)
-			}
-			kept = filtered
-		}
+	if !latestCompatibleInCooldown || !containsHigherIncompatible(kept, latestCompatible) {
+		return kept, nil
 	}
-	return kept, nil
+
+	aware, err := s.moduleAware(ctx, path, latestCompatible)
+	if err != nil {
+		return nil, err
+	}
+
+	if !aware {
+		return kept, nil
+	}
+
+	return s.excludeHigherIncompatible(path, kept, latestCompatible), nil
+}
+
+func (s *Server) excludeHigherIncompatible(path string, kept []string, compatible string) []string {
+	filtered := kept[:0]
+
+	for _, version := range kept {
+		if higherIncompatible(version, compatible) {
+			s.logger.Printf("excluded module=%s version=%s reason=module-aware-compatible-version compatible_version=%s", path, version, compatible)
+			continue
+		}
+
+		filtered = append(filtered, version)
+	}
+
+	return filtered
 }
 
 func containsHigherIncompatible(versions []string, compatible string) bool {
@@ -395,15 +429,16 @@ func (s *Server) info(ctx context.Context, path, version string) (VersionInfo, e
 		}
 		if call, exists := s.inflight[key]; exists {
 			s.cacheMu.Unlock()
-			select {
-			case <-call.done:
-				if call.retryWaiters && ctx.Err() == nil {
-					continue
-				}
-				return call.result.info, call.result.err
-			case <-ctx.Done():
-				return VersionInfo{}, fmt.Errorf("wait for .info for %s@%s: %w", path, version, ctx.Err())
+
+			retry, result, err := waitForInfoCall(ctx, call, path, version)
+			if retry {
+				continue
 			}
+			if err != nil {
+				return VersionInfo{}, err
+			}
+
+			return result.info, result.err
 		}
 		call := &infoCall{done: make(chan struct{})}
 		s.inflight[key] = call
@@ -420,6 +455,21 @@ func (s *Server) info(ctx context.Context, path, version string) (VersionInfo, e
 		close(call.done)
 		s.cacheMu.Unlock()
 		return c.info, c.err
+	}
+}
+
+// waitForInfoCall waits for an in-flight .info call. retry reports that the caller must re-check the cache;
+// err reports only that the wait itself failed, not an error carried by the cached result.
+func waitForInfoCall(ctx context.Context, call *infoCall, path, version string) (bool, cachedInfo, error) {
+	select {
+	case <-call.done:
+		if call.retryWaiters && ctx.Err() == nil {
+			return true, cachedInfo{}, nil
+		}
+
+		return false, call.result, nil
+	case <-ctx.Done():
+		return false, cachedInfo{}, fmt.Errorf("wait for .info for %s@%s: %w", path, version, ctx.Err())
 	}
 }
 
@@ -453,15 +503,16 @@ func (s *Server) moduleAware(ctx context.Context, path, version string) (bool, e
 		}
 		if call, exists := s.awarenessInflight[key]; exists {
 			s.cacheMu.Unlock()
-			select {
-			case <-call.done:
-				if call.retryWaiters && ctx.Err() == nil {
-					continue
-				}
-				return call.result.aware, call.result.err
-			case <-ctx.Done():
-				return false, fmt.Errorf("wait for .mod for %s@%s: %w", path, version, ctx.Err())
+
+			retry, result, err := waitForAwarenessCall(ctx, call, path, version)
+			if retry {
+				continue
 			}
+			if err != nil {
+				return false, err
+			}
+
+			return result.aware, result.err
 		}
 		call := &moduleAwarenessCall{done: make(chan struct{})}
 		s.awarenessInflight[key] = call
@@ -478,6 +529,21 @@ func (s *Server) moduleAware(ctx context.Context, path, version string) (bool, e
 		close(call.done)
 		s.cacheMu.Unlock()
 		return cached.aware, cached.err
+	}
+}
+
+// waitForAwarenessCall waits for an in-flight .mod call. retry reports that the caller must re-check the cache;
+// err reports only that the wait itself failed, not an error carried by the cached result.
+func waitForAwarenessCall(ctx context.Context, call *moduleAwarenessCall, path, version string) (bool, cachedModuleAwareness, error) {
+	select {
+	case <-call.done:
+		if call.retryWaiters && ctx.Err() == nil {
+			return true, cachedModuleAwareness{}, nil
+		}
+
+		return false, call.result, nil
+	case <-ctx.Done():
+		return false, cachedModuleAwareness{}, fmt.Errorf("wait for .mod for %s@%s: %w", path, version, ctx.Err())
 	}
 }
 
@@ -619,11 +685,13 @@ func validateInfo(body []byte, requested string) (VersionInfo, error) {
 	if err := json.Unmarshal(*raw.Time, &stamp); err != nil {
 		return VersionInfo{}, fmt.Errorf("invalid Time: %w", err)
 	}
+
 	t, err := time.Parse(time.RFC3339, stamp)
-	if err != nil || t.IsZero() {
-		if err != nil {
-			return VersionInfo{}, fmt.Errorf("invalid Time: %w", err)
-		}
+	if err != nil {
+		return VersionInfo{}, fmt.Errorf("invalid Time: %w", err)
+	}
+
+	if t.IsZero() {
 		return VersionInfo{}, errors.New("zero Time")
 	}
 	return VersionInfo{Version: *raw.Version, Time: t}, nil

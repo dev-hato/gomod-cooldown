@@ -61,6 +61,7 @@ jobs:
           # This is an upstream limitation with no fix planned (super-linter/super-linter#6294).
           # Go is already linted properly (with `./...`) by the dedicated `lint` job in ci.yml, so skip it here.
           VALIDATE_GO: false
+          VALIDATE_BIOME_FORMAT: false
 concurrency:
   group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: true

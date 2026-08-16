@@ -42,9 +42,9 @@ License 2.0; a copy of that license is provided in
 
 - Fixture: `internal/cli/testdata/large-modules/prometheus/go.mod`
 - Commit: `e4d0e59c87afd0ca06010a03478ad8f89981085b`
-- Source: https://github.com/prometheus/prometheus/blob/e4d0e59c87afd0ca06010a03478ad8f89981085b/go.mod
-- Upstream license: https://github.com/prometheus/prometheus/blob/e4d0e59c87afd0ca06010a03478ad8f89981085b/LICENSE
-- Upstream notice: https://github.com/prometheus/prometheus/blob/e4d0e59c87afd0ca06010a03478ad8f89981085b/NOTICE
+- Source: <https://github.com/prometheus/prometheus/blob/e4d0e59c87afd0ca06010a03478ad8f89981085b/go.mod>
+- Upstream license: <https://github.com/prometheus/prometheus/blob/e4d0e59c87afd0ca06010a03478ad8f89981085b/LICENSE>
+- Upstream notice: <https://github.com/prometheus/prometheus/blob/e4d0e59c87afd0ca06010a03478ad8f89981085b/NOTICE>
 - SHA-256: `5a5c328d946db544e782d28c8a2bf9feab2da530a6a09fe9d59a311f11fab14c`
 - License: Apache-2.0
 - Modification status: unmodified
@@ -67,8 +67,8 @@ are not reproduced here.
 
 - Fixture: `internal/cli/testdata/large-modules/helm/go.mod`
 - Commit: `68977ec0b5a446286668170dd72bdf59695f8cd5`
-- Source: https://github.com/helm/helm/blob/68977ec0b5a446286668170dd72bdf59695f8cd5/go.mod
-- Upstream license: https://github.com/helm/helm/blob/68977ec0b5a446286668170dd72bdf59695f8cd5/LICENSE
+- Source: <https://github.com/helm/helm/blob/68977ec0b5a446286668170dd72bdf59695f8cd5/go.mod>
+- Upstream license: <https://github.com/helm/helm/blob/68977ec0b5a446286668170dd72bdf59695f8cd5/LICENSE>
 - SHA-256: `0514561bb6ded52510d15bafb5eace5d60064f954b42f811f8e75d25d0f0d805`
 - License: Apache-2.0
 - Modification status: unmodified
@@ -81,8 +81,8 @@ Copyright 2016 The Kubernetes Authors All Rights Reserved
 
 - Fixture: `internal/cli/testdata/large-modules/caddy/go.mod`
 - Commit: `873fac5fc094fe538d0c477509127bb321d51a32`
-- Source: https://github.com/caddyserver/caddy/blob/873fac5fc094fe538d0c477509127bb321d51a32/go.mod
-- Upstream license: https://github.com/caddyserver/caddy/blob/873fac5fc094fe538d0c477509127bb321d51a32/LICENSE
+- Source: <https://github.com/caddyserver/caddy/blob/873fac5fc094fe538d0c477509127bb321d51a32/go.mod>
+- Upstream license: <https://github.com/caddyserver/caddy/blob/873fac5fc094fe538d0c477509127bb321d51a32/LICENSE>
 - SHA-256: `ad63430a5588ce8cd311f18c9c572c7de0c491e6d00cedbeb5274ab71fe280ac`
 - License: Apache-2.0
 - Modification status: unmodified

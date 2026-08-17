@@ -310,9 +310,7 @@ func Run(ctx context.Context, args []string, stdin io.Reader, stdout, stderr io.
 }
 
 func childExitStatus(stderr io.Writer, err error) int {
-	var startErr *childStartError
-
-	if errors.As(err, &startErr) {
+	if startErr, ok := errors.AsType[*childStartError](err); ok {
 		_, _ = fmt.Fprintf(stderr, "gomod-cooldown: %v\n", startErr)
 
 		if startErr.notFound {
@@ -322,9 +320,7 @@ func childExitStatus(stderr io.Writer, err error) int {
 		return 126
 	}
 
-	var exit *exec.ExitError
-
-	if errors.As(err, &exit) {
+	if exit, ok := errors.AsType[*exec.ExitError](err); ok {
 		return childExitCode(exit)
 	}
 

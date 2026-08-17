@@ -25,7 +25,7 @@ go install github.com/dev-hato/gomod-cooldown/cmd/gomod-cooldown@latest
 
 再現可能な環境にするには、`latest` を使いたい公開済みのexact versionに置き換えてください。
 `@latest` は最新のtag付きstable releaseを選び、stable releaseが1つもない場合だけ
-pre-releaseを候補にします。
+prereleaseを候補にします。
 
 チェックアウトしたソースからは、`go build ./cmd/gomod-cooldown` でbuildできます。
 
@@ -43,18 +43,18 @@ go mod tidy
 
 このworkflowでは `go get -u all` を避けてください。`all` は、更新前のpackage graphに
 ある依存module内のinternal packageも、提供moduleを更新しながら対象として保持することが
-あります。新しいmoduleからそのinternal packageが削除されていると、main moduleが直接
-importしていなくても `does not contain package` で失敗することがあります。`./...` に
-限定すると、main module内のpackageを起点に更新できます。
+あります。新しいmoduleでそのinternal packageが削除されていることがあります。
+その場合、main moduleが直接importしていなくても `does not contain package` で失敗します。
+`./...` に限定すると、main module内のpackageを起点に更新できます。
 
 構文は `gomod-cooldown [flags] -- command [args...]` です。コマンドはshellを経由せず、
 元のargvのまま実行されます。子プロセスの `GOPROXY` には一時ローカルURLだけが設定
 され、呼び出し元の環境変数や `go env` 設定は変更されません。
 
-フラグ:
+フラグは次のとおりです。
 
 - `--cooldown=14d`: Goのduration形式に加えて、`d` を厳密に24時間として受け付けます。
-  例: `168h`、`1.5d`、`7d`、`14d12h`。`1.5d` は36時間です。正の値が必要です。
+  例： `168h`、`1.5d`、`7d`、`14d12h`。`1.5d` は36時間です。正の値が必要です。
 - `--upstream=https://proxy.golang.org`: 単一の固定upstream GOPROXYを指定します。
 - `--time-source=commit`: 既定値です。`.info.Time` だけを使い、通常のGo commandと
   同じくmodule単位のdiscovery requestだけで完了します。`combined` はindex timestampも
@@ -73,12 +73,12 @@ importしていなくても `does not contain package` で失敗することが�
 - `2`: CLIの使い方が不正な場合。
 - `126`: 子commandは見つかったが起動できなかった場合。
 - `127`: 子commandが見つからなかった場合。
-- それ以外では、子commandが通常終了したstatusをそのまま返します。LinuxとmacOSでは
-  子commandとその子孫を専用process groupで実行し、wrapperに届いたSIGINTとSIGTERMを
+- それ以外では、子commandが通常終了したstatusをそのまま返します。LinuxとmacOSでは、
+  子commandとその子孫を専用process groupで実行します。wrapperに届いたSIGINTとSIGTERMは、
   そのgroupへ1回だけforwardします。対話的なcontrolling terminalでは、実行中だけ
-  子process groupをforegroundにするため、terminal inputとterminal由来のSIGINT/SIGTERMは
-  通常どおり動作します。signal終了は `128 + signal`（SIGINTは`130`、SIGTERMは`143`）として
-  返します。
+  子process groupがforegroundになります。そのため、terminal inputとterminal由来の
+  SIGINT/SIGTERMは通常どおり動作します。signal終了は `128 + signal`（SIGINTは`130`、
+  SIGTERMは`143`）として返します。
 
 helpとversionの出力先はstdoutです。wrapperの診断はstderrへ出力し、子processは呼び出し元の
 stdin、stdout、stderrを引き継ぎます。
@@ -96,14 +96,15 @@ stdin、stdout、stderrを引き継ぎます。
 すべて指定upstreamへ透過します。そのため、`go get example.com/mod@v1.2.3` のような
 明示指定や、`go.mod` にすでに記録されたversionはcooldown中でもダウンロードできます。
 
-upstreamの `@v/list` に含まれるversionの `.info` endpointが404または410を返す場合、
-その取得不能なversionだけを使用不能としてdiscoveryから除外します。このnegative resultは
-同じCLI実行が終わるまでcacheします。403、429、5xx、通信エラー、不正または整合しない
-metadataなど、その他の `.info` 失敗は引き続きdiscovery全体を502でfail closedにします。
+upstreamの `@v/list` に含まれるversionの `.info` endpointが404か410を返すことがあります。
+その場合、その取得不能なversionだけを使用不能としてdiscoveryから除外します。この
+negative resultは同じCLI実行が終わるまでcacheします。403、429、5xx、通信エラー、不正
+または整合しないmetadataなど、その他の `.info` 失敗は引き続きdiscovery全体を502で
+fail closedにします。
 
-また、cooldownによってraw listにある取得可能な最高compatible versionが除外された
-ことだけを理由に、それより高い `+incompatible` versionが暗黙のdiscoveryで選ばれない
-ようにします。除外された
+また、cooldownはraw listにある取得可能な最高compatible versionを除外することが
+あります。その場合でも、それだけを理由に、より高い `+incompatible` versionを
+暗黙のdiscoveryで選びません。除外された
 compatible versionの `.mod` が実際のmodule-awareなファイルなら、それより高い
 `+incompatible` 候補も除外します。`module <path>` だけで構成されたsyntheticなlegacy
 `.mod` はmodule-awareの根拠とみなさないため、その場合は候補を残します。exact指定または
@@ -115,7 +116,7 @@ GOPROXYのdiscovery requestからは、元のversion queryや現在選択中のv
 見えなくなる場合があります。この区別が必要な場合はexact versionを指定してください。
 
 子プロセスの `GOPROXY` に `https://proxy.golang.org,direct` などのfallbackは追加しません。
-discovery endpointが返す404が後段proxyで迂回されないようにするためです。
+discovery endpointが返す404によって、後段proxyで迂回されないようにするためです。
 
 version判定用に検証済みの `.info` metadataも、1回のCLI実行中だけmemoryにcacheして
 再利用します。すべてのcacheは終了時に破棄され、次回起動には引き継ぎません。変化し得る
@@ -127,16 +128,16 @@ version判定用に検証済みの `.info` metadataも、1回のCLI実行中だ�
 指すことがあるためです。既定値がcommit modeなのは、module単位のproxy requestだけで
 判定でき、対話的なCLI利用でも実用的だからです。
 
-公式の `index.golang.org` feedには、module versionが `proxy.golang.org` に最初にcache
-された時刻が含まれます。このfirst-cached timeはavailability timeとして扱いますが、
+公式の `index.golang.org` feedは、module versionが `proxy.golang.org` へ最初にcache
+された時刻を含みます。このfirst-cached timeはavailability timeとして扱いますが、
 厳密なtag公開日時ではありません。
 
-`--time-source=combined` は明示opt-inです。indexにはmodule単位のlookup APIがないため、
-起動時にcutoff直前から現在までの時系列global feedを `since` と `limit=2000` で最終short
-pageまで読み切ります。cooldown期間が長いと時間がかかることがあります。不正record、
-HTTP失敗、timeout、cursorの進行停止はfail closedで扱い、commit timeだけへ黙ってfallback
-しません。このモードでは正確に `https://proxy.golang.org` をupstreamとして指定する必要が
-あります。
+`--time-source=combined` は明示opt-inです。indexにはmodule単位のlookup APIがありません。
+そのため起動時に、cutoff直前から現在までの時系列global feedを `since` と `limit=2000` で
+最終short pageまで読み切ります。cooldownの期間が長い場合、処理に時間がかかります。不正
+record、HTTP失敗、timeout、cursorの進行停止はfail closedで扱い、commit timeだけへ黙って
+fallbackしません。このモードでは正確に `https://proxy.golang.org` をupstreamとして指定
+する必要があります。
 
 候補versionごとの判定は次のとおりです。
 
@@ -151,8 +152,8 @@ availableAt <= cutoff なら許可
 これは厳密なセキュリティ境界ではありません。
 
 upstreamの `@latest` が新しすぎるときは、`@v/list` をフィルタし、許可されたtagged
-releaseのうちsemantic versionが最も高いものを返します。releaseがなければ最も高い
-pre-releaseを返します。pseudo-versionは新たに作りません。そのため、古い候補が
+releaseのうちsemantic versionがもっとも高いものを返します。releaseがなければもっとも高い
+prereleaseを返します。pseudo-versionは新たに作りません。そのため、古い候補が
 pseudo-versionだけのmoduleでは `@latest` が404になることがあります。一方で、pin済み
 pseudo-versionのversion-specific endpointは引き続きダウンロードできます。
 
@@ -170,9 +171,9 @@ pseudo-versionのversion-specific endpointは引き続きダウンロードで�
 - 親moduleと新しく分割されたnested moduleの両方に同じpackageが含まれるために起きる
   ambiguous importは、このツールでは解決できません。古いmodule requirementを削除するか、
   意図したmodule versionを選んでから再実行してください。
-- `go get example.com/mod@v1.2.3` のようなexact requestと、`go.mod` ですでにpinされた
-  versionはversion-specific proxy endpointを使うため、cooldownでは保留されません。これは
-  明示的なescape hatchとして意図した挙動です。
+- `go get example.com/mod@v1.2.3` のようなexact requestは、version-specific proxy
+  endpointを使います。 `go.mod` ですでにpinされたversionも同様です。そのため、cooldownでは
+  保留されません。これは明示的なescape hatchとして意図した挙動です。
 - `GOPRIVATE` や `GONOPROXY` によってGo commandがこのproxyを迂回することがあります。
   これはGo標準の挙動であり、このツールはprivate moduleの取得を制御しません。
 - 対応するupstream GOPROXYは1つだけです。子プロセスにはローカルproxy URLだけを渡し、
@@ -181,8 +182,8 @@ pseudo-versionのversion-specific endpointは引き続きダウンロードで�
   あります。proxyの挙動を確認する際はfresh cacheを使ってください。
 - 502はdiscovery metadataまたは完全なindex snapshotを検証できなかったことを表します。
   空の候補一覧として扱わず、原因をstderrへ出力します。
-- 除外したversionについては、module、version、commit time、取得できたfirst-cached
-  time、effective availability time、cutoffをログに記録します。
+- 除外したversionについては、ログに情報を記録します。記録する項目はmodule、version、
+  commit time、取得できたfirst-cached time、effective availability time、cutoffです。
 - Dependabot security updatesの代替ではありません。併用することを想定しています。
 
 ## 開発
@@ -206,15 +207,16 @@ golangci-lint fmt
 また、Prometheus、Helm、Caddyの固定commitからbyte-for-byteで取得した `go.mod` も
 検証します。fixtureの出典は
 [`internal/cli/testdata/large-modules`](internal/cli/testdata/large-modules) に記録しています。
-GitHub Actionsはtest、race検出、vet、`govulncheck`、version固定した`golangci-lint`、
-cross-platform build smoke testを実行します。リポジトリ内のPRでは別workflowが
+GitHub Actionsはtest、race検出、vetを実行します。さらに、`govulncheck`、version固定
+した`golangci-lint`、cross-platform build smoke testも実行します。リポジトリ内のPRでは別workflowが
 `gofmt`/`goimports`を実行し、安全な差分があれば整形用PRを作成・更新します。
 
 ## 互換性
 
-v1の互換性contractには、flag名と意味、既定値、stdout/stderrの挙動、文書化したexit code、
-上記のplatform別signal handling、`github.com/dev-hato/gomod-cooldown` のinstall/module pathが
-含まれます。filteringの挙動を文書化済みpolicyに戻す修正patchによって、個別versionの判定結果が
+v1の互換性contractには、flag名と意味、既定値、stdout/stderrの挙動が含まれます。さらに、
+文書化したexit code、上記のplatform別signal handlingも含まれます。加えて、
+`github.com/dev-hato/gomod-cooldown` のinstall/module pathも含まれます。filteringの挙動を
+文書化済みpolicyに戻す修正patchによって、個別versionの判定結果が
 変わることはあります。その変更は [CHANGELOG.md](CHANGELOG.md) に記録します。
 
 ## ライセンスと第三者通知

@@ -171,7 +171,7 @@ func newFlagSet() (*flag.FlagSet, *flagValues) {
 	fs.Var((*cooldownValue)(&values.cooldown), "cooldown", "minimum availability age; accepts Go duration strings plus a 'd' day suffix (e.g. 14d, 168h, 1.5d)")
 	fs.StringVar(&values.upstream, "upstream", "https://proxy.golang.org", "upstream GOPROXY URL")
 	fs.Var((*timeSourceValue)(&values.timeSource), "time-source", "availability source: commit or combined")
-	fs.Var((*upstreamTimeoutValue)(&values.timeout), "upstream-timeout", "upstream HTTP timeout")
+	fs.Var((*upstreamTimeoutValue)(&values.timeout), "upstream-timeout", "upstream HTTP and private Go command timeout")
 	fs.BoolVar(&values.verbose, "verbose", false, "log upstream requests and decisions")
 	fs.BoolVar(&values.help, "help", false, "show this help and exit")
 	fs.BoolVar(&values.help, "h", false, "show this help and exit")
@@ -349,6 +349,8 @@ func (e *childStartError) Error() string {
 func (e *childStartError) Unwrap() error { return e.err }
 
 func run(ctx context.Context, opts Options, stdin io.Reader, stdout, stderr io.Writer) error {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 	client := &http.Client{Timeout: opts.UpstreamTimeout}
 	started := time.Now()
 	clock := func() time.Time { return started }
@@ -356,6 +358,17 @@ func run(ctx context.Context, opts Options, stdin io.Reader, stdout, stderr io.W
 	if err != nil {
 		return err
 	}
+	private, err := newPrivateAccess(ctx, opts, os.Environ())
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if cleanupErr := private.close(); cleanupErr != nil {
+			_, _ = fmt.Fprintf(stderr, "gomod-cooldown: %v\n", cleanupErr)
+		}
+	}()
+	client.Transport = private.transport
+	source = privateAvailability{patterns: private.patterns, public: source}
 	p, err := proxy.New(proxy.Config{
 		Upstream: opts.Upstream,
 		Client:   client,
@@ -372,14 +385,15 @@ func run(ctx context.Context, opts Options, stdin io.Reader, stdout, stderr io.W
 	if err != nil {
 		return fmt.Errorf("listen on loopback: %w", err)
 	}
-	srv := &http.Server{Handler: p, ReadHeaderTimeout: 5 * time.Second}
+	srv := &http.Server{Handler: p, ReadHeaderTimeout: 5 * time.Second, BaseContext: func(net.Listener) context.Context { return ctx }}
 	go func() { _ = srv.Serve(ln) }()
 	defer func() {
+		cancel()
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 		_ = srv.Shutdown(shutdownCtx)
 	}()
-	return runChild(ctx, opts.Command, "http://"+ln.Addr().String(), stdin, stdout, stderr)
+	return runChild(ctx, opts.Command, withGOPROXY(private.childEnv, "http://"+ln.Addr().String()), stdin, stdout, stderr)
 }
 
 func resolveSource(ctx context.Context, opts Options, client *http.Client, clock func() time.Time) (availability.Source, error) {
@@ -396,14 +410,14 @@ func resolveSource(ctx context.Context, opts Options, client *http.Client, clock
 	return availability.CombinedSource{Recent: recent}, nil
 }
 
-func runChild(ctx context.Context, command []string, proxyURL string, stdin io.Reader, stdout, stderr io.Writer) error {
+func runChild(ctx context.Context, command, env []string, stdin io.Reader, stdout, stderr io.Writer) error {
 	signals := make(chan os.Signal, 2)
 	signal.Notify(signals, terminationSignals()...)
 	defer signal.Stop(signals)
 	//nolint:gosec // The caller explicitly supplies the argv after --; no shell is involved.
 	cmd := exec.CommandContext(ctx, command[0], command[1:]...)
 	cmd.Stdin, cmd.Stdout, cmd.Stderr = stdin, stdout, stderr
-	cmd.Env = withGOPROXY(os.Environ(), proxyURL)
+	cmd.Env = env
 	restoreForeground, processGroup := prepareChildProcess(cmd, stdin)
 	defer restoreForeground()
 	commandNotFound := errors.Is(cmd.Err, exec.ErrNotFound)

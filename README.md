@@ -16,6 +16,8 @@ It is not affiliated with, endorsed by, or sponsored by the Go project or Google
 ## Installation
 
 Go 1.26.6 or later is required to build or install `gomod-cooldown`.
+Running a wrapped command also requires `go` on `PATH`; help and version output
+do not.
 
 Install the latest published stable release:
 
@@ -64,8 +66,9 @@ Flags:
 - `--time-source=commit` is the default. It uses only `.info.Time` and has the
   same per-module discovery shape as normal Go commands. `combined` is an
   explicit, high-cost mode that also uses index timestamps.
-- `--upstream-timeout=30s` bounds upstream HTTP requests.
-- `--verbose` emits upstream-request and decision diagnostics.
+- `--upstream-timeout=30s` bounds upstream HTTP requests and each private-module
+  Go command.
+- `--verbose` emits module-request and decision diagnostics.
 
 `--help` and `-h` print command help to stdout and exit successfully without
 requiring `--`. `--version` prints `gomod-cooldown <version>` to stdout. A
@@ -90,6 +93,45 @@ Exit statuses are part of the v1 CLI contract:
 Help and version output use stdout. Wrapper diagnostics use stderr, and the
 child process inherits the caller's stdin, stdout, and stderr.
 
+## Private modules
+
+Modules matching the effective `GOPRIVATE` or `GONOPROXY` settings are always
+included in cooldown filtering, using your existing Git/SSH authentication.
+There is no flag to disable private-module filtering.
+
+```sh
+export GOPRIVATE="github.com/your-org/*"
+gomod-cooldown --cooldown=14d -- go get -u -t ./...
+```
+
+Quoted patterns do not need a backslash before `*`. `direct` is a `GOPROXY`
+keyword, not a special value to append to `GOPRIVATE`.
+
+Every wrapped run reads the effective `GOPRIVATE`, `GONOPROXY`, and `GONOSUMDB` with
+`go env`, including saved Go configuration. Modules matching either of the
+first two settings are fetched by a separate `go` command on `PATH`, using
+`GOPROXY=direct` and the caller's Git/SSH/GOAUTH configuration. Authentication
+must already work without an interactive prompt. A temporary workspace and
+module cache keep these internal lookups separate from the caller's module;
+they are removed at exit. Each internal Go command uses the installed toolchain
+without automatic toolchain downloads. If a private dependency requires a newer
+Go version, upgrade the `go` on `PATH` before downloading it through the wrapper.
+
+For the wrapped command only, `GONOPROXY=none` sends requests through the local
+proxy, and the private patterns are added to `GONOSUMDB`, including when it was
+explicitly configured. Private module requests are never forwarded to the
+public upstream or checksum database by the wrapper. Public modules continue to
+use `--upstream`. The caller's environment and saved Go settings are unchanged.
+Private modules use direct repository access even when an existing `GONOPROXY`
+override would normally route them through a corporate proxy.
+
+Private modules use commit time, including with `--time-source=combined`;
+the public Go index cannot supply their first-cached time. A new tag on an old
+commit can therefore already be eligible. Exact versions, pinned versions,
+and the caller's existing module cache retain the limitations described below.
+Go's proxy protocol cannot query branch names containing `/`; use a commit hash
+or canonical version for those branches.
+
 ## What is filtered
 
 Only these version-discovery endpoints are filtered:
@@ -100,7 +142,8 @@ Only these version-discovery endpoints are filtered:
 ```
 
 All version-specific endpoints, including `.info`, `.mod`, and `.zip`, and all
-other GOPROXY endpoints are passed through to the configured upstream. Therefore,
+other GOPROXY endpoints are passed through to the configured upstream (or the
+direct backend for private modules). Therefore,
 an explicit request such as `go get example.com/mod@v1.2.3` and a version already
 recorded in `go.mod` can be downloaded even during its cooldown.
 
@@ -191,8 +234,9 @@ version-specific endpoints.
   version-specific proxy endpoints. A version already pinned in `go.mod` does
   too. So it is not held back by the cooldown. This is intentional and
   provides an explicit escape hatch.
-- `GOPRIVATE` and `GONOPROXY` may cause the Go command to bypass this proxy.
-  That is normal Go behavior; this tool does not control private-module access.
+- Modules matching `GOPRIVATE` or `GONOPROXY` always use the local proxy for
+  discovery filtering, with direct repository access and commit times. There
+  is no private-module filtering opt-out.
 - Exactly one upstream GOPROXY is supported. The child receives only the local
   proxy URL; no `,direct` or secondary-proxy fallback is added.
 - The module cache may satisfy a command without a network request. Use a fresh

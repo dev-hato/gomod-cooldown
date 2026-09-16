@@ -590,7 +590,9 @@ func (s *Server) fetch(ctx context.Context, rawPath string) ([]byte, int, string
 		return nil, 0, "", fmt.Errorf("create upstream request: %w", err)
 	}
 	if s.verbose {
-		s.logger.Printf("upstream GET %s", target)
+		// The configured transport may serve this path directly from private
+		// VCS storage, so the URL does not necessarily identify a network hop.
+		s.logger.Printf("module GET %s", rawPath)
 	}
 	//nolint:gosec // req targets only the validated configured upstream.
 	resp, err := s.client.Do(req)

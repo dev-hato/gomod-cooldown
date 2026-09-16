@@ -16,6 +16,8 @@ Go projectまたはGoogleと提携・承認・スポンサー関係はありま�
 ## インストール
 
 `gomod-cooldown` のbuildとinstallにはGo 1.26.6以降が必要です。
+commandをラップして実行する場合も、`PATH` 上に `go` が必要です。helpとversionの表示には
+不要です。
 
 公開済みの最新stable releaseをinstallします。
 
@@ -59,8 +61,8 @@ go mod tidy
 - `--time-source=commit`: 既定値です。`.info.Time` だけを使い、通常のGo commandと
   同じくmodule単位のdiscovery requestだけで完了します。`combined` はindex timestampも
   使う、高コストの明示opt-inモードです。
-- `--upstream-timeout=30s`: upstream HTTP requestのタイムアウトです。
-- `--verbose`: upstream requestと判定の詳細を出力します。
+- `--upstream-timeout=30s`: upstream HTTP requestと、private module取得用の各Go commandのタイムアウトです。
+- `--verbose`: module requestと判定の詳細を出力します。
 
 `--help` と `-h` は `--` なしでcommand helpをstdoutへ表示し、正常終了します。
 `--version` はstdoutへ `gomod-cooldown <version>` を表示します。module version metadataが
@@ -83,6 +85,41 @@ go mod tidy
 helpとversionの出力先はstdoutです。wrapperの診断はstderrへ出力し、子processは呼び出し元の
 stdin、stdout、stderrを引き継ぎます。
 
+## Private module
+
+有効な `GOPRIVATE` または `GONOPROXY` に一致するmoduleは、既存のGit/SSH認証を使い、
+常にcooldownの対象にします。private moduleのフィルタを無効にするフラグはありません。
+
+```sh
+export GOPRIVATE="github.com/your-org/*"
+gomod-cooldown --cooldown=14d -- go get -u -t ./...
+```
+
+引用符で囲んだpatternの `*` にバックスラッシュは不要です。`direct` は `GOPROXY` の
+keywordであり、`GOPRIVATE` に追加する特別な値ではありません。
+
+commandをラップするたびに `go env` で有効な `GOPRIVATE`、`GONOPROXY`、`GONOSUMDB` を読み、
+保存済みのGo設定も反映します。前二者のどちらかに一致するmoduleは、`PATH` 上の
+別の `go` commandから `GOPROXY=direct` で取得し、呼び出し元のGit/SSH/GOAUTH設定を
+使います。認証は対話入力なしで成功するよう事前に設定してください。内部の取得には
+一時workspaceとmodule cacheを使い、終了時に削除します。内部のGo commandは
+インストール済みのtoolchainを使い、toolchainの自動ダウンロードは行いません。
+private依存がさらに新しいGoを要求する場合は、取得前に `PATH` 上のGoを更新してください。
+
+ラップするcommandにだけ `GONOPROXY=none` を設定してローカルproxyを通し、
+`GONOSUMDB` にprivate対象のpatternを追加します。明示的な `GONOSUMDB` 設定にも
+追加します。wrapperはprivate moduleのrequestを公開upstreamやchecksum databaseへ
+送りません。public moduleは引き続き `--upstream` から取得します。呼び出し元の環境変数や
+保存済みのGo設定は変更しません。既存の `GONOPROXY` 設定でprivate moduleを社内proxyへ
+送っていた場合も、repositoryへ直接アクセスします。
+
+private moduleの判定には `--time-source=combined` でもcommit timeを使います。
+公開Go indexからprivate moduleのfirst-cached timeは取得できません。そのため、古いcommitに
+付けた新しいtagは、すでに取得候補になる場合があります。exact version、pin済みversion、
+呼び出し元の既存module cacheについては、後述の制約が引き続き適用されます。
+Goのproxy protocolでは `/` を含むbranch名をqueryに使えません。その場合はcommit hashか
+canonical versionを指定してください。
+
 ## フィルタ対象
 
 フィルタするのは、次のversion discovery endpointだけです。
@@ -93,7 +130,8 @@ stdin、stdout、stderrを引き継ぎます。
 ```
 
 `.info`、`.mod`、`.zip`を含むversion-specific endpointと、その他のGOPROXY endpointは
-すべて指定upstreamへ透過します。そのため、`go get example.com/mod@v1.2.3` のような
+すべて指定upstreamへ透過します。private moduleは、直接取得用の
+backendへ渡します。そのため、`go get example.com/mod@v1.2.3` のような
 明示指定や、`go.mod` にすでに記録されたversionはcooldown中でもダウンロードできます。
 
 upstreamの `@v/list` に含まれるversionの `.info` endpointが404か410を返すことがあります。
@@ -174,8 +212,9 @@ pseudo-versionのversion-specific endpointは引き続きダウンロードで�
 - `go get example.com/mod@v1.2.3` のようなexact requestは、version-specific proxy
   endpointを使います。 `go.mod` ですでにpinされたversionも同様です。そのため、cooldownでは
   保留されません。これは明示的なescape hatchとして意図した挙動です。
-- `GOPRIVATE` や `GONOPROXY` によってGo commandがこのproxyを迂回することがあります。
-  これはGo標準の挙動であり、このツールはprivate moduleの取得を制御しません。
+- `GOPRIVATE` または `GONOPROXY` に一致するmoduleも常にローカルproxyを通し、repositoryへの
+  直接アクセスとcommit timeに基づいてdiscoveryをフィルタします。private moduleのフィルタを
+  無効にする設定はありません。
 - 対応するupstream GOPROXYは1つだけです。子プロセスにはローカルproxy URLだけを渡し、
   `,direct` や別proxyへのfallbackは追加しません。
 - module cacheに既存データがあれば、Go commandはnetwork requestを行わない場合が

@@ -93,7 +93,7 @@ func TestParseAndEnvironment(t *testing.T) {
 			t.Fatalf("wanted error for %#v", args)
 		}
 	}
-	env := environ([]string{"A=B", "GOPROXY=old", "GOPRIVATE=x"}).withGOPROXY("http://127.0.0.1:1")
+	env := environ{"A=B", "GOPROXY=old", "GOPRIVATE=x"}.withGOPROXY("http://127.0.0.1:1")
 	if strings.Join(env, " ") != "A=B GOPRIVATE=x GOPROXY=http://127.0.0.1:1" {
 		t.Fatal(env)
 	}

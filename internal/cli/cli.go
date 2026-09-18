@@ -260,37 +260,30 @@ func normalizeDayUnits(s string) (string, error) {
 	scanner := cooldownScanner(s)
 	var b strings.Builder
 	for i := 0; i < len(s); {
-		number := scanner.scanDecimal(i)
-		if !number.ok {
+		end, ok := scanner.scanDecimal(i)
+		if !ok {
 			b.WriteByte(s[i])
 			i++
 			continue
 		}
-		if number.end >= len(s) || s[number.end] != 'd' || !scanner.dayNumberCanStart(i) {
-			b.WriteString(s[i:number.end])
-			i = number.end
+		if end >= len(s) || s[end] != 'd' || !scanner.dayNumberCanStart(i) {
+			b.WriteString(s[i:end])
+			i = end
 			continue
 		}
-		nanoseconds, err := dayNanoseconds(s[i:number.end])
+		nanoseconds, err := dayNanoseconds(s[i:end])
 		if err != nil {
 			return "", err
 		}
 		b.WriteString(nanoseconds)
 		b.WriteString("ns")
-		i = number.end + 1
+		i = end + 1
 	}
 	return b.String(), nil
 }
 
 // cooldownScanner is a --cooldown value being scanned for day-suffixed numbers.
 type cooldownScanner string
-
-// scan is one scan result: the index just past the match, and whether the
-// scanned position matched at all.
-type scan struct {
-	end int
-	ok  bool
-}
 
 func (s cooldownScanner) dayNumberCanStart(start int) bool {
 	if start == 0 || s[start] != '.' {
@@ -303,25 +296,30 @@ func (s cooldownScanner) dayNumberCanStart(start int) bool {
 	return slices.Contains([]uint8{'d', 'h', 'm', 's'}, s[start-1])
 }
 
-func (s cooldownScanner) scanDigits(start int) scan {
+// scanDigits returns the index just past the digits at start, and whether any
+// digit was there.
+func (s cooldownScanner) scanDigits(start int) (int, bool) {
 	i := start
 
 	for i < len(s) && s[i] >= '0' && s[i] <= '9' {
 		i++
 	}
 
-	return scan{end: i, ok: start < i}
+	return i, start < i
 }
 
-func (s cooldownScanner) scanDecimal(start int) scan {
-	digits := s.scanDigits(start)
+// scanDecimal returns the index just past the decimal number at start, and
+// whether any digit was there.
+func (s cooldownScanner) scanDecimal(start int) (int, bool) {
+	i, hasDigits := s.scanDigits(start)
 
-	if digits.end < len(s) && s[digits.end] == '.' {
-		fraction := s.scanDigits(digits.end + 1)
-		digits = scan{end: fraction.end, ok: digits.ok || fraction.ok}
+	if i < len(s) && s[i] == '.' {
+		var hasFractionDigits bool
+		i, hasFractionDigits = s.scanDigits(i + 1)
+		hasDigits = hasDigits || hasFractionDigits
 	}
 
-	return digits
+	return i, hasDigits
 }
 
 func dayNanoseconds(decimal string) (string, error) {

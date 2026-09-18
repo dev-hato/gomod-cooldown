@@ -141,8 +141,11 @@ type recentVersions struct {
 	cutoff time.Time
 }
 
-// add merges one page of records and returns the timestamp of the last record,
+// add merges one page of records and returns the timestamp of its last record at or after the cutoff,
 // which becomes the cursor for the next page.
+// Only the first page can contain pre-cutoff records, because the cursor starts one nanosecond early;
+// if such a page held nothing but those,
+// the returned zero timestamp makes the caller fail closed instead of advancing the cursor.
 func (v recentVersions) add(records []Record) (time.Time, error) {
 	var last time.Time
 	for _, r := range records {

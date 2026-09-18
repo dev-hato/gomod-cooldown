@@ -500,8 +500,11 @@ func (child childProcess) forwardSignals(forwarding signalForwarding) {
 	}
 }
 
-func (env environ) withGOPROXY(value string) environ {
-	result := make(environ, 0, len(env)+1)
+// withGOPROXY returns the environment with any GOPROXY entry replaced by value.
+// It returns a plain []string so callers can assign it to exec.Cmd.Env
+// without a conversion reading as if one were required.
+func (env environ) withGOPROXY(value string) []string {
+	result := make([]string, 0, len(env)+1)
 	for _, entry := range env {
 		if !strings.HasPrefix(entry, "GOPROXY=") {
 			result = append(result, entry)

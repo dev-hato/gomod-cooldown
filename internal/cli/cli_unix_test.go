@@ -43,7 +43,7 @@ func TestRunExistingCommandWithMissingInterpreter(t *testing.T) {
 func assertRunFailsWithExitCode126(t *testing.T, command string) {
 	t.Helper()
 	var stdout, stderr bytes.Buffer
-	code := Run(context.Background(), []string{"--", command}, nil, &stdout, &stderr)
+	code := Run(context.Background(), Invocation{Args: []string{"--", command}, Stdin: nil, Stdout: &stdout, Stderr: &stderr})
 	if code != 126 {
 		t.Fatalf("exit=%d stderr=%q", code, stderr.String())
 	}

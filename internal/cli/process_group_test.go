@@ -285,14 +285,14 @@ func TestRunKillsChildProcessGroupWhenContextIsCanceled(t *testing.T) {
 	var stderr lockedBuffer
 	result := make(chan int, 1)
 	go func() {
-		result <- Run(ctx, []string{
+		result <- Run(ctx, Invocation{Args: []string{
 			"--time-source=commit",
 			"--upstream=http://127.0.0.1:1",
 			"--",
 			testExecutable,
 			"-test.run=^TestRunProcessGroupSignalHelper$",
 			"-test.count=1",
-		}, nil, &stdout, &stderr)
+		}, Stdin: nil, Stdout: &stdout, Stderr: &stderr})
 	}()
 	state := readJSONEventually[processGroupReady](t, ready, 10*time.Second, &stderr)
 	cancel()
@@ -382,7 +382,7 @@ func TestRunTTYHelper(t *testing.T) {
 	if ready == "" {
 		return
 	}
-	foreground, err := terminalForegroundGroup(os.Stdin.Fd())
+	foreground, err := terminalFD(os.Stdin.Fd()).foregroundGroup()
 	if err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, "get terminal foreground group: %v\n", err)
 		os.Exit(94)
@@ -510,10 +510,10 @@ func assertProxyClosed(t *testing.T, proxyURL string) {
 
 func TestPrepareChildProcessUsesAGroupForNonTTYInput(t *testing.T) {
 	cmd := exec.Command(os.Args[0], "-test.run=^$")
-	restore, grouped := prepareChildProcess(cmd, strings.NewReader("not a terminal"))
-	defer restore()
-	if !grouped || cmd.SysProcAttr == nil || !cmd.SysProcAttr.Setpgid || cmd.SysProcAttr.Foreground {
-		t.Fatalf("grouped=%v SysProcAttr=%+v", grouped, cmd.SysProcAttr)
+	prepared := Invocation{Stdin: strings.NewReader("not a terminal")}.prepareChildProcess(cmd)
+	defer prepared.restoreForeground()
+	if !prepared.processGroup || cmd.SysProcAttr == nil || !cmd.SysProcAttr.Setpgid || cmd.SysProcAttr.Foreground {
+		t.Fatalf("grouped=%v SysProcAttr=%+v", prepared.processGroup, cmd.SysProcAttr)
 	}
 }
 
@@ -523,7 +523,7 @@ func TestTerminalForegroundGroupRejectsRegularFile(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer file.Close()
-	if group, err := terminalForegroundGroup(file.Fd()); err == nil {
+	if group, err := terminalFD(file.Fd()).foregroundGroup(); err == nil {
 		t.Fatalf("regular file foreground group=%d", group)
 	}
 }

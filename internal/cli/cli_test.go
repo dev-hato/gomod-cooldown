@@ -76,25 +76,24 @@ func TestParseCooldown(t *testing.T) {
 }
 
 func TestParseAndEnvironment(t *testing.T) {
-	var errout bytes.Buffer
-	o, err := Parse([]string{"--cooldown=7d", "--", "echo", "x"}, &errout)
+	o, err := Parse([]string{"--cooldown=7d", "--", "echo", "x"})
 	if err != nil || o.Cooldown != 7*24*time.Hour || o.TimeSource != "commit" || o.Command[0] != "echo" {
 		t.Fatal(o, err)
 	}
-	help, err := Parse([]string{"--help"}, &errout)
+	help, err := Parse([]string{"--help"})
 	if err != nil || help.action != actionHelp {
 		t.Fatalf("help=%+v err=%v", help, err)
 	}
-	version, err := Parse([]string{"--version"}, &errout)
+	version, err := Parse([]string{"--version"})
 	if err != nil || version.action != actionVersion {
 		t.Fatalf("version=%+v err=%v", version, err)
 	}
 	for _, args := range [][]string{{}, {"--cooldown=0", "--", "x"}, {"--", ""}} {
-		if _, err := Parse(args, &errout); err == nil {
+		if _, err := Parse(args); err == nil {
 			t.Fatalf("wanted error for %#v", args)
 		}
 	}
-	env := withGOPROXY([]string{"A=B", "GOPROXY=old", "GOPRIVATE=x"}, "http://127.0.0.1:1")
+	env := environ([]string{"A=B", "GOPROXY=old", "GOPRIVATE=x"}).withGOPROXY("http://127.0.0.1:1")
 	if strings.Join(env, " ") != "A=B GOPRIVATE=x GOPROXY=http://127.0.0.1:1" {
 		t.Fatal(env)
 	}
@@ -105,7 +104,6 @@ func TestParseAndEnvironment(t *testing.T) {
 // so an invalid value for any of them errors out even alongside --help or --version,
 // instead of falling back to showing help/version like before.
 func TestParseInvalidFlagsPrecedeHelpAndVersion(t *testing.T) {
-	var errout bytes.Buffer
 	badArgs := [][]string{
 		{"--cooldown=bogus", "--help"},
 		{"--cooldown=bogus", "--version"},
@@ -116,7 +114,7 @@ func TestParseInvalidFlagsPrecedeHelpAndVersion(t *testing.T) {
 		{"--time-source=bogus", "--version"},
 	}
 	for _, args := range badArgs {
-		if o, err := Parse(args, &errout); err == nil {
+		if o, err := Parse(args); err == nil {
 			t.Fatalf("Parse(%#v) succeeded with %+v, want error", args, o)
 		}
 	}
@@ -125,7 +123,7 @@ func TestParseInvalidFlagsPrecedeHelpAndVersion(t *testing.T) {
 func TestRunHelpAndVersion(t *testing.T) {
 	for _, args := range [][]string{{"--help"}, {"-h"}, {"--help", "--", "must-not-run"}} {
 		var stdout, stderr bytes.Buffer
-		if code := Run(context.Background(), args, nil, &stdout, &stderr); code != 0 {
+		if code := Run(context.Background(), Invocation{Args: args, Stdin: nil, Stdout: &stdout, Stderr: &stderr}); code != 0 {
 			t.Fatalf("Run(%q)=%d, stderr=%q", args, code, stderr.String())
 		}
 		if !strings.HasPrefix(stdout.String(), "Usage: gomod-cooldown ") || !strings.Contains(stdout.String(), "-- command") {
@@ -144,7 +142,7 @@ func TestRunHelpAndVersion(t *testing.T) {
 	}
 
 	var stdout, stderr bytes.Buffer
-	if code := Run(context.Background(), []string{"--version"}, nil, &stdout, &stderr); code != 0 {
+	if code := Run(context.Background(), Invocation{Args: []string{"--version"}, Stdin: nil, Stdout: &stdout, Stderr: &stderr}); code != 0 {
 		t.Fatalf("version exit=%d stderr=%q", code, stderr.String())
 	}
 	if fields := strings.Fields(stdout.String()); len(fields) != 2 || fields[0] != "gomod-cooldown" || fields[1] == "" {
@@ -157,7 +155,7 @@ func TestRunHelpAndVersion(t *testing.T) {
 
 func TestRunUsageErrorIsPrintedOnce(t *testing.T) {
 	var stdout, stderr bytes.Buffer
-	code := Run(context.Background(), []string{"--unknown"}, nil, &stdout, &stderr)
+	code := Run(context.Background(), Invocation{Args: []string{"--unknown"}, Stdin: nil, Stdout: &stdout, Stderr: &stderr})
 	if code != 2 {
 		t.Fatalf("exit=%d stderr=%q", code, stderr.String())
 	}
@@ -306,7 +304,7 @@ func TestRunConnectsStandardStreamsAndDoesNotStartAfterSetupFailure(t *testing.T
 	if executableErr != nil {
 		t.Fatal(executableErr)
 	}
-	code = Run(context.Background(), []string{"--time-source=combined", "--upstream=http://example.invalid", "--", executable, "-test.run=^TestRunProcessHelper$", "--", processHelperMarker, "exit", "7"}, nil, &out, &err)
+	code = Run(context.Background(), Invocation{Args: []string{"--time-source=combined", "--upstream=http://example.invalid", "--", executable, "-test.run=^TestRunProcessHelper$", "--", processHelperMarker, "exit", "7"}, Stdin: nil, Stdout: &out, Stderr: &err})
 	if code != 1 || strings.Contains(err.String(), "exit status 7") {
 		t.Fatalf("code=%d err=%q", code, err.String())
 	}
@@ -351,7 +349,7 @@ func TestRunChildContractAndProxyCleanup(t *testing.T) {
 
 func TestRunCommandNotFound(t *testing.T) {
 	var stdout, stderr bytes.Buffer
-	code := Run(context.Background(), []string{"--", "gomod-cooldown-command-that-does-not-exist"}, nil, &stdout, &stderr)
+	code := Run(context.Background(), Invocation{Args: []string{"--", "gomod-cooldown-command-that-does-not-exist"}, Stdin: nil, Stdout: &stdout, Stderr: &stderr})
 	if code != 127 {
 		t.Fatalf("exit=%d stderr=%q", code, stderr.String())
 	}
@@ -452,7 +450,7 @@ func runProcessHelper(t *testing.T, stdin io.Reader, stdout, stderr io.Writer, a
 		"-test.run=^TestRunProcessHelper$", "-test.count=1", "--", processHelperMarker,
 	}
 	command = append(command, args...)
-	return Run(context.Background(), command, stdin, stdout, stderr)
+	return Run(context.Background(), Invocation{Args: command, Stdin: stdin, Stdout: stdout, Stderr: stderr})
 }
 
 func TestRunInfoCacheLifetime(t *testing.T) {
@@ -568,7 +566,7 @@ func runCacheChild(t *testing.T, executable, upstream string, wants ...string) {
 	defer cancel()
 	var stdout bytes.Buffer
 	var stderr lockedBuffer
-	if code := Run(ctx, args, nil, &stdout, &stderr); code != 0 {
+	if code := Run(ctx, Invocation{Args: args, Stdin: nil, Stdout: &stdout, Stderr: &stderr}); code != 0 {
 		t.Fatalf("child exit=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
 	}
 }

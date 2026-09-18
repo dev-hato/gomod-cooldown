@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/dev-hato/gomod-cooldown/internal/availability"
+	"golang.org/x/mod/module"
 )
 
 func TestSnapshotPagesDuplicatesAndBoundary(t *testing.T) {
@@ -31,7 +32,7 @@ func TestSnapshotPagesDuplicatesAndBoundary(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if calls != 2 || len(m) != 2001 || !m[availability.Key("edge", "v1.0.0")].Equal(cutoff) {
+	if calls != 2 || len(m) != 2001 || !m[availability.Key(module.Version{Path: "edge", Version: "v1.0.0"})].Equal(cutoff) {
 		t.Fatalf("calls=%d len=%d", calls, len(m))
 	}
 }
@@ -89,8 +90,11 @@ func TestSnapshotForCooldownUsesInjectedClock(t *testing.T) {
 	now := time.Date(2026, 7, 11, 0, 0, 0, 0, time.UTC)
 	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
 	defer s.Close()
-	_, cutoff, err := (Fetcher{BaseURL: s.URL, Client: s.Client(), Now: func() time.Time { return now }}).SnapshotForCooldown(context.Background(), 7*24*time.Hour)
-	if err != nil || !cutoff.Equal(now.Add(-7*24*time.Hour)) {
-		t.Fatalf("cutoff=%s err=%v", cutoff, err)
+	snapshot, err := (Fetcher{BaseURL: s.URL, Client: s.Client(), Now: func() time.Time { return now }}).SnapshotForCooldown(context.Background(), 7*24*time.Hour)
+	if err != nil {
+		t.Fatalf("SnapshotForCooldown: %v", err)
+	}
+	if !snapshot.Cutoff.Equal(now.Add(-7 * 24 * time.Hour)) {
+		t.Fatalf("cutoff=%s", snapshot.Cutoff)
 	}
 }

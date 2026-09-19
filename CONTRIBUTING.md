@@ -23,13 +23,13 @@ pre-commit install
 Run the same core checks used by CI:
 
 ```sh
-gofmt -w cmd internal
+go fix ./...
+golangci-lint fmt
 go mod tidy
 go test ./...
 go vet ./...
 go test -race ./...
 golangci-lint run
-golangci-lint fmt
 ```
 
 CI also runs vulnerability analysis and builds and smoke-tests the CLI on
@@ -53,9 +53,10 @@ status in `THIRD_PARTY_NOTICES.md`.
 - Run the checks above and review generated `go.mod` and `go.sum` changes before
   submitting.
 
-The repository's formatting workflow may open or update a separate formatting
-pull request for an in-repository branch. Fork pull requests still receive
-ordinary read-only CI checks.
+The repository's formatting workflow runs `go fix ./...` followed by
+`golangci-lint fmt`, then uses `actions-diff-pr-management` to open or update a
+separate pull request with fixes and formatting changes for an in-repository
+branch. Fork pull requests still receive ordinary read-only CI checks.
 
 ## License
 

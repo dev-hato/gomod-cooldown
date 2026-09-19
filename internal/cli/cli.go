@@ -34,6 +34,47 @@ const (
 	actionVersion
 )
 
+// Invocation is one CLI invocation: its arguments and its standard streams.
+type Invocation struct {
+	Args   []string
+	Stdin  io.Reader
+	Stdout io.Writer
+	Stderr io.Writer
+}
+
+// upstreamDeps are the shared HTTP client and clock used for upstream access.
+type upstreamDeps struct {
+	client *http.Client
+	clock  func() time.Time
+}
+
+// childCommand is the argv to run and the proxy URL to run it against.
+type childCommand struct {
+	command  []string
+	proxyURL string
+}
+
+// childProcess is a started child, plus whether it owns its own process group.
+type childProcess struct {
+	process *os.Process
+	group   bool
+}
+
+// signalForwarding are the channels driving signal forwarding to a child.
+type signalForwarding struct {
+	signals <-chan os.Signal
+	done    <-chan struct{}
+}
+
+// preparedChild is the result of preparing a child command for execution.
+type preparedChild struct {
+	restoreForeground func()
+	processGroup      bool
+}
+
+// environ is a process environment in os.Environ form.
+type environ []string
+
 // Options contains the parsed CLI configuration and child command.
 type Options struct {
 	Cooldown        time.Duration
@@ -46,19 +87,19 @@ type Options struct {
 }
 
 // Parse parses command-line arguments without modifying the process environment.
-func Parse(args []string, _ io.Writer) (Options, error) {
+func Parse(args []string) (Options, error) {
 	sep := slices.Index(args, "--")
 	flagArgs := args
 	if sep >= 0 {
 		flagArgs = args[:sep]
 	}
-	fs, values := newFlagSet()
-	err := fs.Parse(flagArgs)
+	values := newFlags()
+	err := values.fs.Parse(flagArgs)
 	if err != nil {
 		return Options{}, fmt.Errorf("parse flags: %w", err)
 	}
-	if fs.NArg() != 0 {
-		return Options{}, fmt.Errorf("unexpected argument %q before --", fs.Arg(0))
+	if values.fs.NArg() != 0 {
+		return Options{}, fmt.Errorf("unexpected argument %q before --", values.fs.Arg(0))
 	}
 	if values.help {
 		return Options{action: actionHelp}, nil
@@ -85,7 +126,9 @@ func Parse(args []string, _ io.Writer) (Options, error) {
 	}, nil
 }
 
+// flagValues holds the flag.FlagSet and the values its flags write into.
 type flagValues struct {
+	fs         *flag.FlagSet
 	cooldown   time.Duration
 	upstream   string
 	timeSource string
@@ -164,7 +207,7 @@ func (t *timeSourceValue) Set(s string) error {
 	return nil
 }
 
-func newFlagSet() (*flag.FlagSet, *flagValues) {
+func newFlags() *flagValues {
 	values := &flagValues{cooldown: 14 * 24 * time.Hour, timeSource: timeSourceCommit, timeout: 30 * time.Second}
 	fs := flag.NewFlagSet("gomod-cooldown", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
@@ -176,7 +219,9 @@ func newFlagSet() (*flag.FlagSet, *flagValues) {
 	fs.BoolVar(&values.help, "help", false, "show this help and exit")
 	fs.BoolVar(&values.help, "h", false, "show this help and exit")
 	fs.BoolVar(&values.version, "version", false, "show version and exit")
-	return fs, values
+	values.fs = fs
+
+	return values
 }
 
 func writeUsage(w io.Writer) {
@@ -186,7 +231,7 @@ Run a command with a temporary GOPROXY that hides module versions still in coold
 
 Options:
 `)
-	fs, _ := newFlagSet()
+	fs := newFlags().fs
 	fs.SetOutput(w)
 	fs.PrintDefaults()
 }
@@ -212,15 +257,16 @@ func ParseCooldown(s string) (time.Duration, error) {
 }
 
 func normalizeDayUnits(s string) (string, error) {
+	scanner := cooldownScanner(s)
 	var b strings.Builder
 	for i := 0; i < len(s); {
-		end, ok := scanDecimal(s, i)
+		end, ok := scanner.scanDecimal(i)
 		if !ok {
 			b.WriteByte(s[i])
 			i++
 			continue
 		}
-		if end >= len(s) || s[end] != 'd' || !dayNumberCanStart(s, i) {
+		if end >= len(s) || s[end] != 'd' || !scanner.dayNumberCanStart(i) {
 			b.WriteString(s[i:end])
 			i = end
 			continue
@@ -236,7 +282,10 @@ func normalizeDayUnits(s string) (string, error) {
 	return b.String(), nil
 }
 
-func dayNumberCanStart(s string, start int) bool {
+// cooldownScanner is a --cooldown value being scanned for day-suffixed numbers.
+type cooldownScanner string
+
+func (s cooldownScanner) dayNumberCanStart(start int) bool {
 	if start == 0 || s[start] != '.' {
 		return true
 	}
@@ -247,7 +296,9 @@ func dayNumberCanStart(s string, start int) bool {
 	return slices.Contains([]uint8{'d', 'h', 'm', 's'}, s[start-1])
 }
 
-func scanDigits(s string, start int) (int, bool) {
+// scanDigits returns the index just past the digits at start, and whether any
+// digit was there.
+func (s cooldownScanner) scanDigits(start int) (int, bool) {
 	i := start
 
 	for i < len(s) && s[i] >= '0' && s[i] <= '9' {
@@ -257,13 +308,14 @@ func scanDigits(s string, start int) (int, bool) {
 	return i, start < i
 }
 
-func scanDecimal(s string, start int) (int, bool) {
-	i, hasDigits := scanDigits(s, start)
+// scanDecimal returns the index just past the decimal number at start, and
+// whether any digit was there.
+func (s cooldownScanner) scanDecimal(start int) (int, bool) {
+	i, hasDigits := s.scanDigits(start)
 
 	if i < len(s) && s[i] == '.' {
 		var hasFractionDigits bool
-		i++
-		i, hasFractionDigits = scanDigits(s, i)
+		i, hasFractionDigits = s.scanDigits(i + 1)
 		hasDigits = hasDigits || hasFractionDigits
 	}
 
@@ -284,34 +336,34 @@ func dayNanoseconds(decimal string) (string, error) {
 }
 
 // Run starts the proxy and child command, returning the child's exit code.
-func Run(ctx context.Context, args []string, stdin io.Reader, stdout, stderr io.Writer) int {
-	opts, err := Parse(args, stderr)
+func Run(ctx context.Context, inv Invocation) int {
+	opts, err := Parse(inv.Args)
 	if err != nil {
-		_, _ = fmt.Fprintf(stderr, "gomod-cooldown: %v\n", err)
-		_, _ = fmt.Fprintln(stderr, "Try 'gomod-cooldown --help' for usage.")
+		_, _ = fmt.Fprintf(inv.Stderr, "gomod-cooldown: %v\n", err)
+		_, _ = fmt.Fprintln(inv.Stderr, "Try 'gomod-cooldown --help' for usage.")
 		return 2
 	}
 	switch opts.action {
 	case actionHelp:
-		writeUsage(stdout)
+		writeUsage(inv.Stdout)
 		return 0
 	case actionVersion:
-		_, _ = fmt.Fprintf(stdout, "gomod-cooldown %s\n", version())
+		_, _ = fmt.Fprintf(inv.Stdout, "gomod-cooldown %s\n", version())
 		return 0
 	case actionRun:
 		// Continue below.
 	}
-	err = run(ctx, opts, stdin, stdout, stderr)
+	err = inv.run(ctx, opts)
 	if err != nil {
-		return childExitStatus(stderr, err)
+		return inv.childExitStatus(err)
 	}
 
 	return 0
 }
 
-func childExitStatus(stderr io.Writer, err error) int {
+func (inv Invocation) childExitStatus(err error) int {
 	if startErr, ok := errors.AsType[*childStartError](err); ok {
-		_, _ = fmt.Fprintf(stderr, "gomod-cooldown: %v\n", startErr)
+		_, _ = fmt.Fprintf(inv.Stderr, "gomod-cooldown: %v\n", startErr)
 
 		if startErr.notFound {
 			return 127
@@ -324,7 +376,7 @@ func childExitStatus(stderr io.Writer, err error) int {
 		return childExitCode(exit)
 	}
 
-	_, _ = fmt.Fprintf(stderr, "gomod-cooldown: %v\n", err)
+	_, _ = fmt.Fprintf(inv.Stderr, "gomod-cooldown: %v\n", err)
 	return 1
 }
 
@@ -348,11 +400,11 @@ func (e *childStartError) Error() string {
 
 func (e *childStartError) Unwrap() error { return e.err }
 
-func run(ctx context.Context, opts Options, stdin io.Reader, stdout, stderr io.Writer) error {
+func (inv Invocation) run(ctx context.Context, opts Options) error {
 	client := &http.Client{Timeout: opts.UpstreamTimeout}
 	started := time.Now()
 	clock := func() time.Time { return started }
-	source, err := resolveSource(ctx, opts, client, clock)
+	source, err := opts.resolveSource(ctx, upstreamDeps{client: client, clock: clock})
 	if err != nil {
 		return err
 	}
@@ -362,7 +414,7 @@ func run(ctx context.Context, opts Options, stdin io.Reader, stdout, stderr io.W
 		Source:   source,
 		Cooldown: opts.Cooldown,
 		Now:      clock,
-		Logger:   log.New(stderr, "gomod-cooldown: ", 0),
+		Logger:   log.New(inv.Stderr, "gomod-cooldown: ", 0),
 		Verbose:  opts.Verbose,
 	})
 	if err != nil {
@@ -379,53 +431,54 @@ func run(ctx context.Context, opts Options, stdin io.Reader, stdout, stderr io.W
 		defer cancel()
 		_ = srv.Shutdown(shutdownCtx)
 	}()
-	return runChild(ctx, opts.Command, "http://"+ln.Addr().String(), stdin, stdout, stderr)
+	return inv.runChild(ctx, childCommand{command: opts.Command, proxyURL: "http://" + ln.Addr().String()})
 }
 
-func resolveSource(ctx context.Context, opts Options, client *http.Client, clock func() time.Time) (availability.Source, error) {
+func (opts Options) resolveSource(ctx context.Context, deps upstreamDeps) (availability.Source, error) {
 	if opts.TimeSource == timeSourceCommit {
 		return availability.CommitTimeSource{}, nil
 	}
 	if strings.TrimRight(opts.Upstream, "/") != "https://proxy.golang.org" {
 		return nil, errors.New("time-source=combined requires --upstream=https://proxy.golang.org")
 	}
-	recent, _, err := (goindex.Fetcher{Client: client, Now: clock}).SnapshotForCooldown(ctx, opts.Cooldown)
+	snapshot, err := (goindex.Fetcher{Client: deps.client, Now: deps.clock}).SnapshotForCooldown(ctx, opts.Cooldown)
 	if err != nil {
 		return nil, fmt.Errorf("load complete index snapshot: %w", err)
 	}
-	return availability.CombinedSource{Recent: recent}, nil
+	return availability.CombinedSource{Recent: snapshot.Recent}, nil
 }
 
-func runChild(ctx context.Context, command []string, proxyURL string, stdin io.Reader, stdout, stderr io.Writer) error {
+func (inv Invocation) runChild(ctx context.Context, child childCommand) error {
 	signals := make(chan os.Signal, 2)
 	signal.Notify(signals, terminationSignals()...)
 	defer signal.Stop(signals)
 	//nolint:gosec // The caller explicitly supplies the argv after --; no shell is involved.
-	cmd := exec.CommandContext(ctx, command[0], command[1:]...)
-	cmd.Stdin, cmd.Stdout, cmd.Stderr = stdin, stdout, stderr
-	cmd.Env = withGOPROXY(os.Environ(), proxyURL)
-	restoreForeground, processGroup := prepareChildProcess(cmd, stdin)
-	defer restoreForeground()
+	cmd := exec.CommandContext(ctx, child.command[0], child.command[1:]...)
+	cmd.Stdin, cmd.Stdout, cmd.Stderr = inv.Stdin, inv.Stdout, inv.Stderr
+	cmd.Env = environ(os.Environ()).withGOPROXY(child.proxyURL)
+	prepared := inv.prepareChildProcess(cmd)
+	defer prepared.restoreForeground()
 	commandNotFound := errors.Is(cmd.Err, exec.ErrNotFound)
 	if !commandNotFound {
 		_, statErr := os.Stat(cmd.Path)
 		commandNotFound = errors.Is(statErr, os.ErrNotExist)
 	}
 	cmd.Cancel = func() error {
-		return cancelChildProcess(cmd.Process, processGroup)
+		return childProcess{process: cmd.Process, group: prepared.processGroup}.cancel()
 	}
 	if err := cmd.Start(); err != nil {
 		return &childStartError{
-			command:  command[0],
+			command:  child.command[0],
 			err:      err,
 			notFound: commandNotFound || errors.Is(err, exec.ErrNotFound),
 		}
 	}
 	forwardingDone := make(chan struct{})
 	forwardingStopped := make(chan struct{})
+	running := childProcess{process: cmd.Process, group: prepared.processGroup}
 	go func() {
 		defer close(forwardingStopped)
-		forwardSignals(cmd.Process, processGroup, signals, forwardingDone)
+		running.forwardSignals(signalForwarding{signals: signals, done: forwardingDone})
 	}()
 	err := cmd.Wait()
 	close(forwardingDone)
@@ -436,18 +489,21 @@ func runChild(ctx context.Context, command []string, proxyURL string, stdin io.R
 	return nil
 }
 
-func forwardSignals(process *os.Process, processGroup bool, signals <-chan os.Signal, done <-chan struct{}) {
+func (child childProcess) forwardSignals(forwarding signalForwarding) {
 	for {
 		select {
-		case sig := <-signals:
-			_ = forwardSignal(process, processGroup, sig)
-		case <-done:
+		case sig := <-forwarding.signals:
+			_ = child.forwardSignal(sig)
+		case <-forwarding.done:
 			return
 		}
 	}
 }
 
-func withGOPROXY(env []string, value string) []string {
+// withGOPROXY returns the environment with any GOPROXY entry replaced by value.
+// It returns a plain []string so callers can assign it to exec.Cmd.Env
+// without a conversion reading as if one were required.
+func (env environ) withGOPROXY(value string) []string {
 	result := make([]string, 0, len(env)+1)
 	for _, entry := range env {
 		if !strings.HasPrefix(entry, "GOPROXY=") {

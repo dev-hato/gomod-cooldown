@@ -14,9 +14,9 @@ func terminationSignals() []os.Signal {
 	return []os.Signal{os.Interrupt, syscall.SIGTERM}
 }
 
-func forwardSignal(process *os.Process, processGroup bool, sig os.Signal) error {
-	if !processGroup {
-		if err := process.Signal(sig); err != nil {
+func (child childProcess) forwardSignal(sig os.Signal) error {
+	if !child.group {
+		if err := child.process.Signal(sig); err != nil {
 			return fmt.Errorf("forward %s to child: %w", sig, err)
 		}
 		return nil
@@ -25,14 +25,14 @@ func forwardSignal(process *os.Process, processGroup bool, sig os.Signal) error 
 	if !ok {
 		return fmt.Errorf("forward unsupported signal %T to child process group", sig)
 	}
-	if err := syscall.Kill(-process.Pid, syscallSignal); err != nil {
+	if err := syscall.Kill(-child.process.Pid, syscallSignal); err != nil {
 		return fmt.Errorf("forward %s to child: %w", sig, err)
 	}
 	return nil
 }
 
-func cancelChildProcess(process *os.Process, processGroup bool) error {
-	err := forwardSignal(process, processGroup, os.Kill)
+func (child childProcess) cancel() error {
+	err := child.forwardSignal(os.Kill)
 	if errors.Is(err, syscall.ESRCH) {
 		return os.ErrProcessDone
 	}

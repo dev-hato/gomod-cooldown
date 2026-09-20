@@ -12,15 +12,15 @@ func terminationSignals() []os.Signal {
 	return []os.Signal{os.Interrupt}
 }
 
-func forwardSignal(process *os.Process, _ bool, sig os.Signal) error {
-	if err := process.Signal(sig); err != nil {
+func (child childProcess) forwardSignal(sig os.Signal) error {
+	if err := child.process.Signal(sig); err != nil {
 		return fmt.Errorf("forward %s to child: %w", sig, err)
 	}
 	return nil
 }
 
-func cancelChildProcess(process *os.Process, _ bool) error {
-	return process.Kill()
+func (child childProcess) cancel() error {
+	return child.process.Kill()
 }
 
 func childExitCode(exit *exec.ExitError) int {

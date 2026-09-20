@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/dev-hato/gomod-cooldown/internal/availability"
+	"golang.org/x/mod/module"
 )
 
 var now = time.Date(2026, 7, 11, 12, 0, 0, 0, time.UTC)
@@ -41,7 +42,7 @@ func TestListFiltersAvailabilityAndOrder(t *testing.T) {
 	defer up.Close()
 	firstNew := now.Add(-2 * time.Hour)
 	s := newTestServer(t, up.URL, availability.CombinedSource{Recent: map[string]time.Time{
-		availability.Key("example.com/m", "v1.1.0"): firstNew,
+		availability.Key(module.Version{Path: "example.com/m", Version: "v1.1.0"}): firstNew,
 	}})
 	r := httptest.NewRecorder()
 	s.ServeHTTP(r, httptest.NewRequest(http.MethodGet, "/example.com/m/@v/list", nil))
@@ -760,7 +761,7 @@ func TestInfoCacheWaiterRetriesAfterLeaderCancellation(t *testing.T) {
 	defer cancelLeader()
 	leaderDone := make(chan error, 1)
 	go func() {
-		_, err := s.info(leaderCtx, "example.com/m", "v1.0.0")
+		_, err := s.info(leaderCtx, module.Version{Path: "example.com/m", Version: "v1.0.0"})
 		leaderDone <- err
 	}()
 	receiveWithin(t, firstStarted, "leader request")
@@ -768,7 +769,7 @@ func TestInfoCacheWaiterRetriesAfterLeaderCancellation(t *testing.T) {
 	waiterCtx := &doneObservingContext{Context: context.Background(), observed: make(chan struct{})}
 	waiterDone := make(chan infoResult, 1)
 	go func() {
-		got, err := s.info(waiterCtx, "example.com/m", "v1.0.0")
+		got, err := s.info(waiterCtx, module.Version{Path: "example.com/m", Version: "v1.0.0"})
 		waiterDone <- infoResult{info: got, err: err}
 	}()
 	receiveWithin(t, waiterCtx.observed, "waiter join")
@@ -804,7 +805,7 @@ func TestInfoCacheCanceledWaiterDoesNotCancelLeader(t *testing.T) {
 
 	leaderDone := make(chan error, 1)
 	go func() {
-		_, err := s.info(context.Background(), "example.com/m", "v1.0.0")
+		_, err := s.info(context.Background(), module.Version{Path: "example.com/m", Version: "v1.0.0"})
 		leaderDone <- err
 	}()
 	receiveWithin(t, firstStarted, "leader request")
@@ -814,7 +815,7 @@ func TestInfoCacheCanceledWaiterDoesNotCancelLeader(t *testing.T) {
 	waiterCtx := &doneObservingContext{Context: waiterBase, observed: make(chan struct{})}
 	waiterDone := make(chan error, 1)
 	go func() {
-		_, err := s.info(waiterCtx, "example.com/m", "v1.0.0")
+		_, err := s.info(waiterCtx, module.Version{Path: "example.com/m", Version: "v1.0.0"})
 		waiterDone <- err
 	}()
 	receiveWithin(t, waiterCtx.observed, "waiter join")
@@ -827,7 +828,7 @@ func TestInfoCacheCanceledWaiterDoesNotCancelLeader(t *testing.T) {
 	if err := receiveWithin(t, leaderDone, "leader request"); err != nil {
 		t.Fatalf("leader error=%v", err)
 	}
-	if _, err := s.info(context.Background(), "example.com/m", "v1.0.0"); err != nil {
+	if _, err := s.info(context.Background(), module.Version{Path: "example.com/m", Version: "v1.0.0"}); err != nil {
 		t.Fatal(err)
 	}
 	if infoCalls.Load() != 1 {
@@ -877,7 +878,7 @@ func requireOKStatuses(t *testing.T, statuses <-chan int, count int) {
 
 type callsSource struct{ n atomic.Int32 }
 
-func (s *callsSource) AvailableAt(context.Context, string, string, time.Time) (availability.Availability, error) {
+func (s *callsSource) AvailableAt(availability.Query) (availability.Availability, error) {
 	s.n.Add(1)
 	return availability.Availability{}, nil
 }

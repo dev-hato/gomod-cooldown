@@ -219,14 +219,14 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// net/http decodes URL escaping in Path. Real Go clients percent-encode the
 	// exclamation marks used by the module proxy protocol for uppercase letters.
 	if mod := listSuffix.moduleFor(r.URL.Path); mod != "" {
-		ex.handleList(mod)
+		ex.handleList(r.Context(), mod)
 		return
 	}
 	if mod := latestSuffix.moduleFor(r.URL.Path); mod != "" {
-		ex.handleLatest(mod)
+		ex.handleLatest(r.Context(), mod)
 		return
 	}
-	ex.passthrough()
+	ex.passthrough(r.Context())
 }
 
 // moduleFor returns the module path addressed by rawPath, or "" when rawPath does not address this suffix.
@@ -249,8 +249,8 @@ func (suffix pathSuffix) moduleFor(rawPath string) string {
 // fetchDiscovery fetches the upstream discovery response for path.
 // It returns nil once the request cannot be handled further,
 // having already written the error or passthrough response itself.
-func (ex exchange) fetchDiscovery(path string) *upstreamResponse {
-	resp, err := ex.server.fetch(ex.r.Context(), ex.r.URL.EscapedPath())
+func (ex exchange) fetchDiscovery(ctx context.Context, path string) *upstreamResponse {
+	resp, err := ex.server.fetch(ctx, ex.r.URL.EscapedPath())
 	if err != nil {
 		ex.badGateway(err)
 		return nil
@@ -267,12 +267,12 @@ func (ex exchange) fetchDiscovery(path string) *upstreamResponse {
 	return &resp
 }
 
-func (ex exchange) handleList(path string) {
-	discovery := ex.fetchDiscovery(path)
+func (ex exchange) handleList(ctx context.Context, path string) {
+	discovery := ex.fetchDiscovery(ctx, path)
 	if discovery == nil {
 		return
 	}
-	kept, err := ex.server.filter(ex.r.Context(), moduleVersions{path: path, versions: parseList(discovery.body)})
+	kept, err := ex.server.filter(ctx, moduleVersions{path: path, versions: parseList(discovery.body)})
 	if err != nil {
 		ex.badGateway(err)
 		return
@@ -285,8 +285,8 @@ func (ex exchange) handleList(path string) {
 	}
 }
 
-func (ex exchange) handleLatest(path string) {
-	discovery := ex.fetchDiscovery(path)
+func (ex exchange) handleLatest(ctx context.Context, path string) {
+	discovery := ex.fetchDiscovery(ctx, path)
 	if discovery == nil {
 		return
 	}
@@ -296,10 +296,10 @@ func (ex exchange) handleLatest(path string) {
 		return
 	}
 
-	resolved, err := ex.server.resolveLatestTag(ex.r.Context(), latest.at(path))
+	resolved, err := ex.server.resolveLatestTag(ctx, latest.at(path))
 	if err != nil {
 		if errors.Is(err, errFallbackToList) {
-			ex.handleLatestFallback(path)
+			ex.handleLatestFallback(ctx, path)
 			return
 		}
 
@@ -323,7 +323,7 @@ func (ex exchange) handleLatest(path string) {
 	// semantically higher +incompatible tag appear to be the latest version.
 	// Pseudo-versions are absent from @v/list and must continue through @latest.
 	// Reconcile such tags with the filtered list and the module-awareness check.
-	ex.handleLatestFallback(path)
+	ex.handleLatestFallback(ctx, path)
 }
 
 // resolveLatestTag reconciles a pseudo-version-free @latest with its tagged .info.
@@ -348,13 +348,13 @@ func (s *Server) resolveLatestTag(ctx context.Context, latest moduleInfo) (Versi
 	return tagInfo, nil
 }
 
-func (ex exchange) handleLatestFallback(path string) {
+func (ex exchange) handleLatestFallback(ctx context.Context, path string) {
 	listPath, err := listSuffix.endpoint(path)
 	if err != nil {
 		ex.badGateway(err)
 		return
 	}
-	list, err := ex.server.fetch(ex.r.Context(), listPath)
+	list, err := ex.server.fetch(ctx, listPath)
 	if err != nil {
 		ex.badGateway(err)
 		return
@@ -367,7 +367,7 @@ func (ex exchange) handleLatestFallback(path string) {
 		ex.writeUpstream(upstreamResponse{body: list.body, status: list.status, contentType: "text/plain; charset=utf-8"})
 		return
 	}
-	kept, err := ex.server.filter(ex.r.Context(), moduleVersions{path: path, versions: parseList(list.body)})
+	kept, err := ex.server.filter(ctx, moduleVersions{path: path, versions: parseList(list.body)})
 	if err != nil {
 		ex.badGateway(err)
 		return
@@ -377,7 +377,7 @@ func (ex exchange) handleLatestFallback(path string) {
 		http.NotFound(ex.w, ex.r)
 		return
 	}
-	info, err := ex.server.info(ex.r.Context(), module.Version{Path: path, Version: chosen})
+	info, err := ex.server.info(ctx, module.Version{Path: path, Version: chosen})
 	if err != nil {
 		ex.badGateway(err)
 		return
@@ -673,14 +673,14 @@ func (s *Server) fetch(ctx context.Context, rawPath string) (upstreamResponse, e
 	return upstreamResponse{body: body, status: resp.StatusCode, contentType: resp.Header.Get("Content-Type")}, nil
 }
 
-func (ex exchange) passthrough() {
+func (ex exchange) passthrough(ctx context.Context) {
 	target, err := ex.server.upstreamURL(ex.r.URL.EscapedPath())
 	if err != nil {
 		ex.badGateway(err)
 		return
 	}
 	// target is constructed from the validated fixed upstream URL.
-	req, err := http.NewRequestWithContext(ex.r.Context(), http.MethodGet, target, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, target, nil)
 	if err != nil {
 		ex.badGateway(err)
 		return

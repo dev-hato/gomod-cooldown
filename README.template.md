@@ -214,13 +214,13 @@ Windows. See
 contribution process.
 
 ```sh
-gofmt -w cmd internal
+go fix ./...
+golangci-lint fmt
 go mod tidy
 go test ./...
 go vet ./...
 go test -race ./...
 golangci-lint run
-golangci-lint fmt
 ```
 
 Tests use `httptest.Server`, injected clients/clocks, and no external network.
@@ -230,8 +230,9 @@ Helm, and Caddy. Fixture provenance is recorded in
 [`internal/cli/testdata/large-modules`](internal/cli/testdata/large-modules).
 GitHub Actions runs tests, race detection, and vet. It also runs
 `govulncheck`, pinned `golangci-lint`, and cross-platform build smoke tests.
-For an in-repository pull request, a separate workflow runs `gofmt`/`goimports`
-and opens or updates a formatting pull request when safe changes are available.
+For an in-repository pull request, a separate workflow runs `go fix ./...`, then
+`golangci-lint fmt` (`gofmt`/`goimports`), and opens or updates a pull request with
+the resulting fixes and formatting changes using `actions-diff-pr-management`.
 
 ## Compatibility
 

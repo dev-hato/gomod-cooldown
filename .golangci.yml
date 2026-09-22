@@ -9,7 +9,6 @@ linters:
   disable:
     - arangolint
     - clickhouselint
-    - contextcheck
     - cyclop
     - depguard
     - err113
@@ -22,7 +21,6 @@ linters:
     - goheader
     - gomodguard
     - gomodguard_v2
-    - goprintffuncname
     - importas
     - ireturn
     - lll
@@ -31,7 +29,6 @@ linters:
     - musttag
     - nlreturn
     - noinlineerr
-    - paralleltest
     - prealloc
     - promlinter
     - protogetter
@@ -42,11 +39,16 @@ linters:
     - tagliatelle
     - testifylint
     - testpackage
-    - tparallel
     - varnamelen
     - wsl
     - wsl_v5
     - zerologlint
+  settings:
+    paralleltest:
+      # Process and environment tests must remain free to run serially.
+      ignore-missing: true
+      # Cleanup must wait for any parallel subtests to finish.
+      check-cleanup: true
   exclusions:
     generated: strict
     rules:

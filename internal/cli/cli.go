@@ -427,7 +427,8 @@ func (inv Invocation) run(ctx context.Context, opts Options) error {
 	srv := &http.Server{Handler: p, ReadHeaderTimeout: 5 * time.Second}
 	go func() { _ = srv.Serve(ln) }()
 	defer func() {
-		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		// Preserve context values while allowing shutdown after command cancellation.
+		shutdownCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
 		defer cancel()
 		_ = srv.Shutdown(shutdownCtx)
 	}()

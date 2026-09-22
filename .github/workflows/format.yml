@@ -48,6 +48,8 @@ jobs:
         with:
           version-file: .tool-versions
           install-only: true
+      - run: go fix ./...
+        if: github.event.action != 'closed'
       - run: golangci-lint fmt
         if: github.event.action != 'closed'
       - name: Update README
@@ -68,6 +70,6 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           branch-name-prefix: chore/format
-          pr-title-prefix: "chore: apply formatting and sync README"
-          pr-description-prefix: "Automated formatting changes produced by golangci-lint fmt, prettier, and README/README.ja regenerated from their templates."
+          pr-title-prefix: "chore: apply Go fixes, formatting, and sync README"
+          pr-description-prefix: "Automated changes produced by go fix, golangci-lint fmt, prettier, and README/README.ja regenerated from their templates."
           exit-failure: false

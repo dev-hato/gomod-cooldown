@@ -193,13 +193,13 @@ pseudo-versionのversion-specific endpointは引き続きダウンロードで�
 全確認手順とcontribution processは [CONTRIBUTING.md](CONTRIBUTING.md) を参照してください。
 
 ```sh
-gofmt -w cmd internal
+go fix ./...
+golangci-lint fmt
 go mod tidy
 go test ./...
 go vet ./...
 go test -race ./...
 golangci-lint run
-golangci-lint fmt
 ```
 
 テストは `httptest.Server`、inject可能なHTTP clientとclockを使うため、外部networkに
@@ -209,7 +209,8 @@ golangci-lint fmt
 [`internal/cli/testdata/large-modules`](internal/cli/testdata/large-modules) に記録しています。
 GitHub Actionsはtest、race検出、vetを実行します。さらに、`govulncheck`、version固定
 した`golangci-lint`、cross-platform build smoke testも実行します。リポジトリ内のPRでは別workflowが
-`gofmt`/`goimports`を実行し、安全な差分があれば整形用PRを作成・更新します。
+`go fix ./...`、`golangci-lint fmt`（`gofmt`/`goimports`）の順に実行し、
+差分があれば`actions-diff-pr-management`で修正・整形用PRを作成・更新します。
 
 ## 互換性
 

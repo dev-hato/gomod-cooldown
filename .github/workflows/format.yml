@@ -41,7 +41,7 @@ jobs:
           cache: npm
       - uses: flatt-security/setup-takumi-guard-golang@37631ecffa6faf06754444a4807451b7a55c64b5 # v1.2.0
         if: github.event.action != 'closed'
-      - uses: flatt-security/setup-takumi-guard-npm@6d4182745c1e474c35a023573c2612c085be45a4 # v1.2.0
+      - uses: flatt-security/setup-takumi-guard-npm@3d2e7e64161c6fb76c74abd6600e4248d4859153 # v1.3.0
         if: github.event.action != 'closed'
       - uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
         if: github.event.action != 'closed'

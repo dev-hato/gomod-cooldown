@@ -15,7 +15,7 @@ It is not affiliated with, endorsed by, or sponsored by the Go project or Google
 
 ## Installation
 
-Go 1.26.6 or later is required to build or install `gomod-cooldown`.
+Go 1.26.9 or later is required to build or install `gomod-cooldown`.
 
 Install the latest published stable release:
 
@@ -207,8 +207,8 @@ version-specific endpoints.
 
 ## Development
 
-The minimum supported toolchain is Go 1.26.6. CI runs the core test suite on
-Go 1.26.6, and tests, builds, and smoke-tests the CLI on Linux, macOS, and
+The minimum supported toolchain is Go 1.26.9. CI runs the core test suite on
+Go 1.26.9, and tests, builds, and smoke-tests the CLI on Linux, macOS, and
 Windows. See
 [CONTRIBUTING.md](CONTRIBUTING.md) for the full local verification and
 contribution process.

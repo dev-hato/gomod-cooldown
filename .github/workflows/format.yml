@@ -57,7 +57,7 @@ jobs:
         env:
           GO_VERSION: ${{ steps.setup-go.outputs.go-version }}
         run: |
-          for name in README README.ja
+          for name in README README.ja CONTRIBUTING
           do
             envsubst '$GO_VERSION' < "$name.template.md" > "$name.md"
           done

@@ -52,7 +52,7 @@ jobs:
         if: github.event.action != 'closed'
       - run: golangci-lint fmt
         if: github.event.action != 'closed'
-      - name: Update README
+      - name: Update README and CONTRIBUTING
         if: github.event.action != 'closed'
         env:
           GO_VERSION: ${{ steps.setup-go.outputs.go-version }}
@@ -70,6 +70,6 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           branch-name-prefix: chore/format
-          pr-title-prefix: "chore: apply Go fixes, formatting, and sync README"
-          pr-description-prefix: "Automated changes produced by go fix, golangci-lint fmt, prettier, and README/README.ja regenerated from their templates."
+          pr-title-prefix: "chore: apply Go fixes, formatting, and sync README and CONTRIBUTING"
+          pr-description-prefix: "Automated changes produced by go fix, golangci-lint fmt, prettier, and README/README.ja/CONTRIBUTING regenerated from their templates."
           exit-failure: false

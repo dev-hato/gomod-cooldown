@@ -88,18 +88,30 @@ func testSignalForwarding(t *testing.T, wrapper, testExecutable string, sig sysc
 	)
 	cmd.Env = append(os.Environ(), signalHelperEnvironment+"="+ready)
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr
+
+	// The helper runs in its own process group and inherits these pipes, so it can outlive a killed wrapper;
+	// do not let Wait block on it forever.
+	cmd.WaitDelay = 2 * time.Second
+
 	if err := cmd.Start(); err != nil {
 		t.Fatal(err)
 	}
 	finished := false
-	t.Cleanup(func() {
+	stop := func() {
 		if !finished {
+			finished = true
 			_ = cmd.Process.Kill()
 			_ = cmd.Wait()
 		}
-	})
+	}
+	t.Cleanup(stop)
 
-	proxyURL := waitForSignalHelper(t, ready, &stderr)
+	proxyURL, err := waitForSignalHelper(ready, 30*time.Second)
+	if err != nil {
+		stop()
+		t.Fatalf("%v; stderr=%q", err, stderr.String())
+	}
+
 	if err := cmd.Process.Signal(sig); err != nil {
 		t.Fatalf("signal wrapper: %v", err)
 	}
@@ -144,28 +156,32 @@ func TestRunSignalHelper(t *testing.T) {
 		_, _ = fmt.Fprintf(os.Stderr, "write ready file: %v\n", err)
 		os.Exit(90)
 	}
-	for {
-		time.Sleep(time.Hour)
+
+	// Exit once the wrapper is gone, so a test that killed it does not leak us.
+	parent := os.Getppid()
+
+	for os.Getppid() == parent {
+		time.Sleep(100 * time.Millisecond)
 	}
 }
 
-func waitForSignalHelper(t *testing.T, ready string, stderr *bytes.Buffer) string {
-	t.Helper()
-	deadline := time.Now().Add(10 * time.Second)
+// waitForSignalHelper does not read the command's output buffers:
+// they are written concurrently until the command has been waited for.
+func waitForSignalHelper(ready string, timeout time.Duration) (string, error) {
+	deadline := time.Now().Add(timeout)
 	for time.Now().Before(deadline) {
 		contents, err := os.ReadFile(ready)
 		if err == nil {
 			proxyURL := string(contents)
 			if !strings.HasPrefix(proxyURL, "http://127.0.0.1:") {
-				t.Fatalf("helper GOPROXY=%q", proxyURL)
+				return "", fmt.Errorf("helper GOPROXY=%q", proxyURL)
 			}
-			return proxyURL
+			return proxyURL, nil
 		}
 		if !os.IsNotExist(err) {
-			t.Fatalf("read ready file: %v", err)
+			return "", fmt.Errorf("read ready file: %w", err)
 		}
 		time.Sleep(10 * time.Millisecond)
 	}
-	t.Fatalf("signal helper did not start; stderr=%q", stderr.String())
-	return ""
+	return "", fmt.Errorf("signal helper did not start within %s", timeout)
 }

@@ -25,6 +25,11 @@ project follows [Semantic Versioning](https://semver.org/).
 - Forward process signals and preserve meaningful child-process exit behavior.
 - Parse fractional day durations consistently with `d` defined as exactly 24
   hours.
+- Reject local proxy requests whose path contains `.` or `..` segments, or
+  whose `Host` is not the loopback listener address.
+- Fail discovery closed with 502 when a buffered upstream response
+  (`@v/list`, `@latest`, `.info`, or `.mod`) exceeds 16 MiB, and fail index
+  setup when an index page holds more records than requested.
 
 ## Earlier releases
 

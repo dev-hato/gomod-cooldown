@@ -181,6 +181,11 @@ func decodePage(body interface {
 			return nil, fmt.Errorf("decode index record: %w", err)
 		}
 		records = append(records, r)
+
+		// A page larger than requested is malformed and would otherwise grow without bound.
+		if recordsLimit < len(records) {
+			return nil, fmt.Errorf("index page has more than %d records", recordsLimit)
+		}
 	}
 	if err := s.Err(); err != nil {
 		return nil, fmt.Errorf("read index response: %w", err)

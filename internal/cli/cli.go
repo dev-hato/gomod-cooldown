@@ -424,7 +424,7 @@ func (inv Invocation) run(ctx context.Context, opts Options) error {
 	if err != nil {
 		return fmt.Errorf("listen on loopback: %w", err)
 	}
-	srv := &http.Server{Handler: p, ReadHeaderTimeout: 5 * time.Second}
+	srv := &http.Server{Handler: listenerHostOnly(ln.Addr().String(), p), ReadHeaderTimeout: 5 * time.Second}
 	go func() { _ = srv.Serve(ln) }()
 	defer func() {
 		// Preserve context values while allowing shutdown after command cancellation.
@@ -433,6 +433,19 @@ func (inv Invocation) run(ctx context.Context, opts Options) error {
 		_ = srv.Shutdown(shutdownCtx)
 	}()
 	return inv.runChild(ctx, childCommand{command: opts.Command, proxyURL: "http://" + ln.Addr().String()})
+}
+
+// listenerHostOnly rejects requests whose Host is not the loopback listener
+// address, so a DNS-rebinding web page cannot use the proxy.
+func listenerHostOnly(addr string, next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Host != addr {
+			http.Error(w, "invalid Host", http.StatusMisdirectedRequest)
+			return
+		}
+
+		next.ServeHTTP(w, r)
+	})
 }
 
 func (opts Options) resolveSource(ctx context.Context, deps upstreamDeps) (availability.Source, error) {

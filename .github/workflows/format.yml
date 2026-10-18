@@ -61,8 +61,11 @@ jobs:
           do
             envsubst '$GO_VERSION' < "$name.template.md" > "$name.md"
           done
-      - run: npm install
+      # This job has write permissions, so don't run dependency install scripts.
+      - run: npm install --ignore-scripts
         if: github.event.action != 'closed'
+      - if: github.event.action != 'closed'
+        run: npx --no-install rulesync generate
       - run: npx prettier --write .
         if: github.event.action != 'closed'
       - uses: dev-hato/actions-diff-pr-management@a3c6f1d6cb3f46d2f48ac3856ef603ef2e508061 # v2.4.0
@@ -71,5 +74,5 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           branch-name-prefix: chore/format
           pr-title-prefix: "chore: apply Go fixes, formatting, and sync README and CONTRIBUTING"
-          pr-description-prefix: "Automated changes produced by go fix, golangci-lint fmt, prettier, and README/README.ja/CONTRIBUTING regenerated from their templates."
+          pr-description-prefix: "Automated changes produced by go fix, golangci-lint fmt, rulesync, prettier, and README/README.ja/CONTRIBUTING regenerated from their templates."
           exit-failure: false

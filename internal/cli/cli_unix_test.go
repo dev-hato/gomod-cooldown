@@ -152,15 +152,19 @@ func TestRunSignalHelper(t *testing.T) {
 	if ready == "" {
 		return
 	}
+	// Exit once the wrapper is gone, so a test that killed it does not leak us.
+	// The wrapper may already be gone before the first Getppid, in which case
+	// parent is the adopting process; the lifetime limit covers that case. It
+	// must exceed the readiness and signal-wait timeouts.
+	parent := os.Getppid()
+	deadline := time.Now().Add(2 * time.Minute)
+
 	if err := os.WriteFile(ready, []byte(os.Getenv("GOPROXY")), 0o600); err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, "write ready file: %v\n", err)
 		os.Exit(90)
 	}
 
-	// Exit once the wrapper is gone, so a test that killed it does not leak us.
-	parent := os.Getppid()
-
-	for os.Getppid() == parent {
+	for os.Getppid() == parent && time.Now().Before(deadline) {
 		time.Sleep(100 * time.Millisecond)
 	}
 }

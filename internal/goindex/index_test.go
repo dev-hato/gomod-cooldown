@@ -98,3 +98,28 @@ func TestSnapshotForCooldownUsesInjectedClock(t *testing.T) {
 		t.Fatalf("cutoff=%s", snapshot.Cutoff)
 	}
 }
+
+func TestSnapshotRejectsOversizedPage(t *testing.T) {
+	cutoff := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+
+	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		for i := range recordsLimit + 1 {
+			if _, err := fmt.Fprintf(
+				w,
+				`{"Path":"m%d","Version":"v1.0.0","Timestamp":%q}`+"\n",
+				i,
+				cutoff.Add(time.Duration(i+1)*time.Nanosecond).Format(time.RFC3339Nano),
+			); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}))
+	defer s.Close()
+
+	fetcher := Fetcher{BaseURL: s.URL, Client: s.Client()}
+
+	_, err := fetcher.Snapshot(context.Background(), cutoff)
+	if err == nil || !strings.Contains(err.Error(), "more than") {
+		t.Fatalf("err = %v", err)
+	}
+}

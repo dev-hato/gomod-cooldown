@@ -9,6 +9,7 @@ import (
 	"log"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -903,4 +904,60 @@ func fakeProxy(t *testing.T, data map[string]string) *httptest.Server {
 }
 func info(v string, tm time.Time) string {
 	return fmt.Sprintf(`{"Version":%q,"Time":%q}`, v, tm.Format(time.RFC3339))
+}
+
+func TestRejectsDotSegmentsInRequestPath(t *testing.T) {
+	var upstreamCalls atomic.Int32
+
+	up := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		upstreamCalls.Add(1)
+		if _, err := io.WriteString(w, "secret"); err != nil {
+			t.Fatal(err)
+		}
+	}))
+	defer up.Close()
+
+	s := newTestServer(t, up.URL+"/prefix", availability.CommitTimeSource{})
+
+	for _, target := range []string{
+		"/example.com/m/../../admin/@v/v1.0.0.info",
+		"/%2e%2e/admin/@v/list",
+		"/example.com/./m/@latest",
+		"/example.com/m/@v/..",
+	} {
+		r := httptest.NewRecorder()
+		s.ServeHTTP(r, httptest.NewRequest(http.MethodGet, target, nil))
+		if r.Code != http.StatusBadRequest {
+			t.Fatalf("%s: status=%d body=%q", target, r.Code, r.Body.String())
+		}
+	}
+
+	if upstreamCalls.Load() != 0 {
+		t.Fatalf("upstream calls = %d", upstreamCalls.Load())
+	}
+}
+
+func TestOversizedUpstreamResponseFailsClosed(t *testing.T) {
+	oversized := strings.Repeat("v", maxUpstreamBody+1)
+	path := "/example.com/m/@v/list"
+
+	for name, data := range map[string]map[string]string{
+		"list": {path: oversized},
+		"info": {path: "v1.0.0\n", "/example.com/m/@v/v1.0.0.info": oversized},
+	} {
+		t.Run(name, func(t *testing.T) {
+			up := fakeProxy(t, data)
+			defer up.Close()
+
+			r := httptest.NewRecorder()
+			newTestServer(t, up.URL, availability.CommitTimeSource{}).ServeHTTP(
+				r,
+				httptest.NewRequest(http.MethodGet, path, nil),
+			)
+
+			if r.Code != http.StatusBadGateway || !strings.Contains(r.Body.String(), "exceeds") {
+				t.Fatalf("status=%d body=%.200q", r.Code, r.Body.String())
+			}
+		})
+	}
 }

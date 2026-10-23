@@ -129,20 +129,34 @@ func testSignalForwarding(t *testing.T, wrapper, testExecutable string, sig sysc
 		t.Fatalf("wait=%v exit=%v, want %d; stdout=%q stderr=%q", waitErr, exit, wantCode, stdout.String(), stderr.String())
 	}
 
-	// The wrapper exits with 128+signal on its own, so only the helper's record
-	// proves that the signal reached the child.
+	assertHelperReceivedSignal(t, result, sig)
+
+	client := &http.Client{Timeout: 500 * time.Millisecond}
+
+	response, err := client.Get(proxyURL)
+	if err != nil {
+		return
+	}
+	defer func() {
+		if err := response.Body.Close(); err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	t.Fatalf("proxy still accepts requests after signal exit: %s", proxyURL)
+}
+
+// assertHelperReceivedSignal checks the helper's record of the signal it received.
+// The wrapper exits with 128+signal on its own, so only this record proves that the signal reached the child.
+func assertHelperReceivedSignal(t *testing.T, result string, sig syscall.Signal) {
+	t.Helper()
+
 	received, err := os.ReadFile(result)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if string(received) != strconv.Itoa(int(sig)) {
 		t.Fatalf("helper received signal %q, want %d", received, sig)
-	}
-
-	client := &http.Client{Timeout: 500 * time.Millisecond}
-	if response, requestErr := client.Get(proxyURL); requestErr == nil {
-		_ = response.Body.Close()
-		t.Fatalf("proxy still accepts requests after signal exit: %s", proxyURL)
 	}
 }
 

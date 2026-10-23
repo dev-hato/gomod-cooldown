@@ -130,20 +130,7 @@ func testSignalForwarding(t *testing.T, wrapper, testExecutable string, sig sysc
 	}
 
 	assertHelperReceivedSignal(t, result, sig)
-
-	client := &http.Client{Timeout: 500 * time.Millisecond}
-
-	response, err := client.Get(proxyURL)
-	if err != nil {
-		return
-	}
-	defer func() {
-		if err := response.Body.Close(); err != nil {
-			t.Fatal(err)
-		}
-	}()
-
-	t.Fatalf("proxy still accepts requests after signal exit: %s", proxyURL)
+	assertProxyStoppedAfterSignal(t, proxyURL)
 }
 
 // assertHelperReceivedSignal checks the helper's record of the signal it received.
@@ -158,6 +145,25 @@ func assertHelperReceivedSignal(t *testing.T, result string, sig syscall.Signal)
 	if string(received) != strconv.Itoa(int(sig)) {
 		t.Fatalf("helper received signal %q, want %d", received, sig)
 	}
+}
+
+// assertProxyStoppedAfterSignal checks that the wrapper shut its proxy down: a request must fail.
+func assertProxyStoppedAfterSignal(t *testing.T, proxyURL string) {
+	t.Helper()
+
+	client := &http.Client{Timeout: 500 * time.Millisecond}
+
+	response, err := client.Get(proxyURL)
+	if err != nil {
+		return
+	}
+	defer func() {
+		if err := response.Body.Close(); err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	t.Fatalf("proxy still accepts requests after signal exit: %s", proxyURL)
 }
 
 func waitUnixTestCommand(t *testing.T, cmd *exec.Cmd, timeout time.Duration) error {

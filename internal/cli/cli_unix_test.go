@@ -10,14 +10,19 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"syscall"
 	"testing"
 	"time"
 )
 
-const signalHelperEnvironment = "GOMOD_COOLDOWN_SIGNAL_HELPER"
+const (
+	signalHelperEnvironment       = "GOMOD_COOLDOWN_SIGNAL_HELPER"
+	signalHelperResultEnvironment = "GOMOD_COOLDOWN_SIGNAL_HELPER_RESULT"
+)
 
 func TestRunCannotExecuteCommand(t *testing.T) {
 	command := filepath.Join(t.TempDir(), "not-executable")
@@ -75,7 +80,9 @@ func TestRunForwardsSignalsAndShutsDownProxy(t *testing.T) {
 
 func testSignalForwarding(t *testing.T, wrapper, testExecutable string, sig syscall.Signal, wantCode int) {
 	t.Helper()
-	ready := filepath.Join(t.TempDir(), "ready")
+	dir := t.TempDir()
+	ready := filepath.Join(dir, "ready")
+	result := filepath.Join(dir, "result")
 	var stdout, stderr bytes.Buffer
 	cmd := exec.Command(
 		wrapper,
@@ -86,7 +93,7 @@ func testSignalForwarding(t *testing.T, wrapper, testExecutable string, sig sysc
 		"-test.run=^TestRunSignalHelper$",
 		"-test.count=1",
 	)
-	cmd.Env = append(os.Environ(), signalHelperEnvironment+"="+ready)
+	cmd.Env = append(os.Environ(), signalHelperEnvironment+"="+ready, signalHelperResultEnvironment+"="+result)
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr
 
 	// The helper runs in its own process group and inherits these pipes, so it can outlive a killed wrapper;
@@ -120,6 +127,16 @@ func testSignalForwarding(t *testing.T, wrapper, testExecutable string, sig sysc
 	var exit *exec.ExitError
 	if !errors.As(waitErr, &exit) || exit.ExitCode() != wantCode {
 		t.Fatalf("wait=%v exit=%v, want %d; stdout=%q stderr=%q", waitErr, exit, wantCode, stdout.String(), stderr.String())
+	}
+
+	// The wrapper exits with 128+signal on its own, so only the helper's record
+	// proves that the signal reached the child.
+	received, err := os.ReadFile(result)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(received) != strconv.Itoa(int(sig)) {
+		t.Fatalf("helper received signal %q, want %d", received, sig)
 	}
 
 	client := &http.Client{Timeout: 500 * time.Millisecond}
@@ -158,6 +175,8 @@ func TestRunSignalHelper(t *testing.T) {
 	// must exceed the readiness and signal-wait timeouts.
 	parent := os.Getppid()
 	deadline := time.Now().Add(2 * time.Minute)
+	signals := make(chan os.Signal, 1)
+	signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM)
 
 	if err := os.WriteFile(ready, []byte(os.Getenv("GOPROXY")), 0o600); err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, "write ready file: %v\n", err)
@@ -165,7 +184,30 @@ func TestRunSignalHelper(t *testing.T) {
 	}
 
 	for os.Getppid() == parent && time.Now().Before(deadline) {
-		time.Sleep(100 * time.Millisecond)
+		select {
+		case received := <-signals:
+			sig, ok := received.(syscall.Signal)
+			if !ok {
+				t.Fatalf("received signal %v of type %T, want syscall.Signal", received, received)
+			}
+
+			result := os.Getenv(signalHelperResultEnvironment)
+
+			if err := os.WriteFile(result, []byte(strconv.Itoa(int(sig))), 0o600); err != nil {
+				t.Fatal(err)
+			}
+
+			// Die from the signal as an unhandled child would.
+			signal.Reset(sig)
+
+			if err := syscall.Kill(os.Getpid(), sig); err != nil {
+				t.Fatal(err)
+			}
+
+			time.Sleep(time.Second)
+			os.Exit(92)
+		case <-time.After(100 * time.Millisecond):
+		}
 	}
 }
 

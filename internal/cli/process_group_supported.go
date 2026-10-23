@@ -3,6 +3,7 @@
 package cli
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -53,7 +54,7 @@ func (fd terminalFD) foregroundGroup() (int, error) {
 		uintptr(unsafe.Pointer(&group)),
 	)
 	if errno != 0 {
-		return 0, errno
+		return 0, fmt.Errorf("ioctl TIOCGPGRP: %w", errno)
 	}
 	return int(group), nil
 }
@@ -73,7 +74,7 @@ func (fd terminalFD) setForegroundGroup(group int) error {
 		uintptr(unsafe.Pointer(&group32)),
 	)
 	if errno != 0 {
-		return errno
+		return fmt.Errorf("ioctl TIOCSPGRP: %w", errno)
 	}
 	return nil
 }

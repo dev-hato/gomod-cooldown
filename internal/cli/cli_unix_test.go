@@ -152,18 +152,10 @@ func assertProxyStoppedAfterSignal(t *testing.T, proxyURL string) {
 	t.Helper()
 
 	client := &http.Client{Timeout: 500 * time.Millisecond}
-
-	response, err := client.Get(proxyURL)
-	if err != nil {
-		return
+	if response, requestErr := client.Get(proxyURL); requestErr == nil {
+		_ = response.Body.Close()
+		t.Fatalf("proxy still accepts requests after signal exit: %s", proxyURL)
 	}
-	defer func() {
-		if err := response.Body.Close(); err != nil {
-			t.Fatal(err)
-		}
-	}()
-
-	t.Fatalf("proxy still accepts requests after signal exit: %s", proxyURL)
 }
 
 func waitUnixTestCommand(t *testing.T, cmd *exec.Cmd, timeout time.Duration) error {

@@ -69,6 +69,10 @@ const (
 	latestSuffix pathSuffix = "/@latest"
 )
 
+// maxUpstreamBody bounds each buffered upstream response (@v/list, @latest, .info, and .mod)
+// so a hostile upstream cannot exhaust memory. Passthrough responses such as .zip are streamed and are not buffered.
+const maxUpstreamBody = 16 << 20
+
 // upstreamResponse is a complete upstream reply the proxy may forward.
 type upstreamResponse struct {
 	body        []byte
@@ -215,6 +219,14 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "only GET is supported", http.StatusMethodNotAllowed)
 		return
 	}
+
+	// Module paths never contain . or .. elements, and forwarding them would let
+	// a request reach upstream paths outside the configured prefix.
+	if hasDotSegment(r.URL.Path) {
+		http.Error(w, "invalid request path", http.StatusBadRequest)
+		return
+	}
+
 	ex := exchange{server: s, w: w, r: r}
 	// net/http decodes URL escaping in Path. Real Go clients percent-encode the
 	// exclamation marks used by the module proxy protocol for uppercase letters.
@@ -666,10 +678,15 @@ func (s *Server) fetch(ctx context.Context, rawPath string) (upstreamResponse, e
 		return upstreamResponse{}, fmt.Errorf("upstream request: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
-	body, err := io.ReadAll(resp.Body)
+	body, err := io.ReadAll(io.LimitReader(resp.Body, maxUpstreamBody+1))
 	if err != nil {
 		return upstreamResponse{}, fmt.Errorf("read upstream response: %w", err)
 	}
+
+	if maxUpstreamBody < len(body) {
+		return upstreamResponse{}, fmt.Errorf("upstream response for %s exceeds %d bytes", rawPath, maxUpstreamBody)
+	}
+
 	return upstreamResponse{body: body, status: resp.StatusCode, contentType: resp.Header.Get("Content-Type")}, nil
 }
 
@@ -821,6 +838,12 @@ func (s *Server) upstreamURL(rawPath string) (string, error) {
 	target.RawPath = strings.TrimRight(s.upstream.EscapedPath(), "/") + rawPath
 	target.RawQuery = ""
 	return target.String(), nil
+}
+
+func hasDotSegment(path string) bool {
+	return slices.ContainsFunc(strings.Split(path, "/"), func(segment string) bool {
+		return segment == "." || segment == ".."
+	})
 }
 
 func isHopHeader(key string) bool {

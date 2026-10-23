@@ -591,3 +591,30 @@ func (b *lockedBuffer) String() string {
 	defer b.mu.Unlock()
 	return b.b.String()
 }
+
+func TestListenerHostOnlyRejectsOtherHosts(t *testing.T) {
+	var served atomic.Int32
+	addr := "127.0.0.1:4321"
+	h := listenerHostOnly(addr, http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+		served.Add(1)
+	}))
+
+	for host, want := range map[string]int{
+		addr:                http.StatusOK,
+		"attacker.example":  http.StatusMisdirectedRequest,
+		"localhost:4321":    http.StatusMisdirectedRequest,
+		"127.0.0.1:4321.ex": http.StatusMisdirectedRequest,
+	} {
+		req := httptest.NewRequest(http.MethodGet, "/example.com/m/@v/list", nil)
+		req.Host = host
+		r := httptest.NewRecorder()
+		h.ServeHTTP(r, req)
+		if r.Code != want {
+			t.Fatalf("Host %q: status=%d, want %d", host, r.Code, want)
+		}
+	}
+
+	if served.Load() != 1 {
+		t.Fatalf("served = %d", served.Load())
+	}
+}

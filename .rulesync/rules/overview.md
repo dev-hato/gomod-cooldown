@@ -31,3 +31,36 @@ Tests must be deterministic and never touch the network: use `httptest.Server`, 
 ## Compatibility constraints
 
 v1 commits to flag names/meanings, defaults, stdout vs. stderr usage, documented exit codes (0, 1, 2, 126, 127, child status, 128+signal), the platform signal behavior, and the module path. Treat changes to any of these as breaking; record behavior corrections in `CHANGELOG.md`.
+
+## Security
+
+gomod-cooldown sits between the Go command and an upstream GOPROXY and decides which module versions dependency updates can see.
+CI jobs here also run with write-capable tokens.
+When implementing or reviewing, check that the change withstands malicious input and operations.
+Working correctly is not enough.
+
+- Treat everything from the upstream proxy and `index.golang.org` as attacker-controlled.
+  Module paths, version lists, `.info`/`.mod` bodies, timestamps, and headers can all be crafted by module authors or a hostile upstream.
+- Discovery must fail closed.
+  Malformed, inconsistent, or unverifiable metadata must yield an error (502, or a setup failure for the index), never an unfiltered list or a silent fallback that lets a version bypass the cooldown.
+  Never add a `,direct` or secondary-proxy fallback to the child's `GOPROXY`.
+- Hostile responses must never cause panics, hangs, or unbounded memory, goroutine, or cache growth.
+  Keep upstream requests bounded by `--upstream-timeout` and the request context.
+- Keep the local proxy bound to loopback only.
+  Treat requests from the child as untrusted too, and never let a crafted request path reach a different upstream host or escape the configured upstream path.
+- Start the child directly with its original argv, never through a shell.
+  Change only `GOPROXY` in its environment.
+- Do not leak credentials or secrets (for example, upstream URL userinfo or environment values) in logs or error messages.
+- In GitHub Actions workflows and scripts, keep values from outside inside their string or code:
+  - Do not embed `${{ }}` values directly in `run:`; pass them via `env:`.
+  - In shell, always double-quote variables, and never use `eval` or build commands from strings.
+  - In jobs with write permissions, keep `persist-credentials: false` and least-privilege `permissions`.
+    Also keep `npm install --ignore-scripts` there.
+- Pin new external Actions to full commit SHAs.
+  Avoid dependency versions that were published only very recently.
+- When fixing a security issue, always write tests that confirm the issue no longer reproduces.
+  - Use the inputs an attacker would use, and confirm the fixed code rejects them safely.
+    For example, a fake upstream returning malformed `.info`, oversized or inconsistent lists, or crafted module paths.
+  - Confirm the tests fail against the code before the fix, so they actually detect the issue.
+- If a vulnerability is found during review, do not write the details in a public issue or PR.
+  Report it privately via the process in `SECURITY.md`.

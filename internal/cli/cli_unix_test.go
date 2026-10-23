@@ -10,14 +10,19 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"syscall"
 	"testing"
 	"time"
 )
 
-const signalHelperEnvironment = "GOMOD_COOLDOWN_SIGNAL_HELPER"
+const (
+	signalHelperEnvironment       = "GOMOD_COOLDOWN_SIGNAL_HELPER"
+	signalHelperResultEnvironment = "GOMOD_COOLDOWN_SIGNAL_HELPER_RESULT"
+)
 
 func TestRunCannotExecuteCommand(t *testing.T) {
 	command := filepath.Join(t.TempDir(), "not-executable")
@@ -75,7 +80,9 @@ func TestRunForwardsSignalsAndShutsDownProxy(t *testing.T) {
 
 func testSignalForwarding(t *testing.T, wrapper, testExecutable string, sig syscall.Signal, wantCode int) {
 	t.Helper()
-	ready := filepath.Join(t.TempDir(), "ready")
+	dir := t.TempDir()
+	ready := filepath.Join(dir, "ready")
+	result := filepath.Join(dir, "result")
 	var stdout, stderr bytes.Buffer
 	cmd := exec.Command(
 		wrapper,
@@ -86,20 +93,32 @@ func testSignalForwarding(t *testing.T, wrapper, testExecutable string, sig sysc
 		"-test.run=^TestRunSignalHelper$",
 		"-test.count=1",
 	)
-	cmd.Env = append(os.Environ(), signalHelperEnvironment+"="+ready)
+	cmd.Env = append(os.Environ(), signalHelperEnvironment+"="+ready, signalHelperResultEnvironment+"="+result)
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr
+
+	// The helper runs in its own process group and inherits these pipes, so it can outlive a killed wrapper;
+	// do not let Wait block on it forever.
+	cmd.WaitDelay = 2 * time.Second
+
 	if err := cmd.Start(); err != nil {
 		t.Fatal(err)
 	}
 	finished := false
-	t.Cleanup(func() {
+	stop := func() {
 		if !finished {
+			finished = true
 			_ = cmd.Process.Kill()
 			_ = cmd.Wait()
 		}
-	})
+	}
+	t.Cleanup(stop)
 
-	proxyURL := waitForSignalHelper(t, ready, &stderr)
+	proxyURL, err := waitForSignalHelper(ready, 30*time.Second)
+	if err != nil {
+		stop()
+		t.Fatalf("%v; stderr=%q", err, stderr.String())
+	}
+
 	if err := cmd.Process.Signal(sig); err != nil {
 		t.Fatalf("signal wrapper: %v", err)
 	}
@@ -109,6 +128,28 @@ func testSignalForwarding(t *testing.T, wrapper, testExecutable string, sig sysc
 	if !errors.As(waitErr, &exit) || exit.ExitCode() != wantCode {
 		t.Fatalf("wait=%v exit=%v, want %d; stdout=%q stderr=%q", waitErr, exit, wantCode, stdout.String(), stderr.String())
 	}
+
+	assertHelperReceivedSignal(t, result, sig)
+	assertProxyStoppedAfterSignal(t, proxyURL)
+}
+
+// assertHelperReceivedSignal checks the helper's record of the signal it received.
+// The wrapper exits with 128+signal on its own, so only this record proves that the signal reached the child.
+func assertHelperReceivedSignal(t *testing.T, result string, sig syscall.Signal) {
+	t.Helper()
+
+	received, err := os.ReadFile(result)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(received) != strconv.Itoa(int(sig)) {
+		t.Fatalf("helper received signal %q, want %d", received, sig)
+	}
+}
+
+// assertProxyStoppedAfterSignal checks that the wrapper shut its proxy down: a request must fail.
+func assertProxyStoppedAfterSignal(t *testing.T, proxyURL string) {
+	t.Helper()
 
 	client := &http.Client{Timeout: 500 * time.Millisecond}
 	if response, requestErr := client.Get(proxyURL); requestErr == nil {
@@ -140,32 +181,65 @@ func TestRunSignalHelper(t *testing.T) {
 	if ready == "" {
 		return
 	}
+	// Exit once the wrapper is gone, so a test that killed it does not leak us.
+	// The wrapper may already be gone before the first Getppid, in which case
+	// parent is the adopting process; the lifetime limit covers that case. It
+	// must exceed the readiness and signal-wait timeouts.
+	parent := os.Getppid()
+	deadline := time.Now().Add(2 * time.Minute)
+	signals := make(chan os.Signal, 1)
+	signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM)
+
 	if err := os.WriteFile(ready, []byte(os.Getenv("GOPROXY")), 0o600); err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, "write ready file: %v\n", err)
 		os.Exit(90)
 	}
-	for {
-		time.Sleep(time.Hour)
+
+	for os.Getppid() == parent && time.Now().Before(deadline) {
+		select {
+		case received := <-signals:
+			sig, ok := received.(syscall.Signal)
+			if !ok {
+				t.Fatalf("received signal %v of type %T, want syscall.Signal", received, received)
+			}
+
+			result := os.Getenv(signalHelperResultEnvironment)
+
+			if err := os.WriteFile(result, []byte(strconv.Itoa(int(sig))), 0o600); err != nil {
+				t.Fatal(err)
+			}
+
+			// Die from the signal as an unhandled child would.
+			signal.Reset(sig)
+
+			if err := syscall.Kill(os.Getpid(), sig); err != nil {
+				t.Fatal(err)
+			}
+
+			time.Sleep(time.Second)
+			os.Exit(92)
+		case <-time.After(100 * time.Millisecond):
+		}
 	}
 }
 
-func waitForSignalHelper(t *testing.T, ready string, stderr *bytes.Buffer) string {
-	t.Helper()
-	deadline := time.Now().Add(10 * time.Second)
+// waitForSignalHelper does not read the command's output buffers:
+// they are written concurrently until the command has been waited for.
+func waitForSignalHelper(ready string, timeout time.Duration) (string, error) {
+	deadline := time.Now().Add(timeout)
 	for time.Now().Before(deadline) {
 		contents, err := os.ReadFile(ready)
 		if err == nil {
 			proxyURL := string(contents)
 			if !strings.HasPrefix(proxyURL, "http://127.0.0.1:") {
-				t.Fatalf("helper GOPROXY=%q", proxyURL)
+				return "", fmt.Errorf("helper GOPROXY=%q", proxyURL)
 			}
-			return proxyURL
+			return proxyURL, nil
 		}
 		if !os.IsNotExist(err) {
-			t.Fatalf("read ready file: %v", err)
+			return "", fmt.Errorf("read ready file: %w", err)
 		}
 		time.Sleep(10 * time.Millisecond)
 	}
-	t.Fatalf("signal helper did not start; stderr=%q", stderr.String())
-	return ""
+	return "", fmt.Errorf("signal helper did not start within %s", timeout)
 }

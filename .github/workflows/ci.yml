@@ -5,13 +5,14 @@ on:
       - main
   pull_request:
   merge_group:
-permissions:
-  contents: read
+permissions: {}
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 jobs:
   go-versions:
+    permissions:
+      contents: read
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
@@ -45,6 +46,8 @@ jobs:
 
           echo "versions=${versions}" >> "$GITHUB_OUTPUT"
   unit:
+    permissions:
+      contents: read
     name: unit (Go ${{ matrix.go-version }})
     needs: go-versions
     runs-on: ubuntu-latest
@@ -65,6 +68,8 @@ jobs:
       - run: go test ./...
       - run: go vet ./...
   race:
+    permissions:
+      contents: read
     name: race
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -78,6 +83,8 @@ jobs:
       - uses: flatt-security/setup-takumi-guard-golang@02545d3425218766aac4dca114dcc3f6eaa0df4a # v1.3.0
       - run: go test -race ./...
   platform:
+    permissions:
+      contents: read
     name: build/smoke (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     timeout-minutes: 15
@@ -113,6 +120,8 @@ jobs:
           go version -m "${binary}" | tee build-info.txt
           grep -F "github.com/dev-hato/gomod-cooldown/cmd/gomod-cooldown" build-info.txt
   vulnerability:
+    permissions:
+      contents: read
     name: govulncheck
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -158,6 +167,8 @@ jobs:
           done
   # Keep this stable check name: the main branch ruleset requires "lint".
   lint:
+    permissions:
+      contents: read
     name: lint
     runs-on: ubuntu-latest
     timeout-minutes: 15

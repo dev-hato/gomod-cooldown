@@ -1,0 +1,7 @@
+{
+  // Generate each AI agent's instruction file from the rules in .rulesync/
+  "targets": ["claudecode", "codexcli", "copilot"],
+  "features": ["rules"],
+  "baseDirs": ["."],
+  "delete": true,
+}

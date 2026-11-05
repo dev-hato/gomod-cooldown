@@ -149,12 +149,12 @@ type privateAvailability struct {
 	public   availability.Source
 }
 
-func (s privateAvailability) AvailableAt(ctx context.Context, path, version string, commitTime time.Time) (availability.Availability, error) {
+func (s privateAvailability) AvailableAt(query availability.Query) (availability.Availability, error) {
 	source := s.public
-	if module.MatchPrefixPatterns(s.patterns, path) {
+	if module.MatchPrefixPatterns(s.patterns, query.Module.Path) {
 		source = availability.CommitTimeSource{}
 	}
-	result, err := source.AvailableAt(ctx, path, version, commitTime)
+	result, err := source.AvailableAt(query)
 	if err != nil {
 		return result, fmt.Errorf("module availability: %w", err)
 	}

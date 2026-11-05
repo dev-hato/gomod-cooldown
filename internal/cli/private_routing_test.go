@@ -2,7 +2,6 @@ package cli
 
 import (
 	"bytes"
-	"context"
 	"errors"
 	"io"
 	"net/http"
@@ -25,16 +24,18 @@ func TestRunDoesNotStartChildWithoutPrivateRouting(t *testing.T) {
 	}
 	t.Setenv("PATH", t.TempDir())
 	var stdout, stderr bytes.Buffer
-	code := Run(t.Context(), []string{
-		"--", executable, "-test.run=^TestRunProcessHelper$", "--", processHelperMarker, "exit", "7",
-	}, nil, &stdout, &stderr)
+	code := Run(t.Context(), Invocation{
+		Args:   []string{"--", executable, "-test.run=^TestRunProcessHelper$", "--", processHelperMarker, "exit", "7"},
+		Stdout: &stdout,
+		Stderr: &stderr,
+	})
 	if code != 1 || stdout.Len() != 0 || !strings.Contains(stderr.String(), "private module routing requires go on PATH") {
 		t.Fatalf("code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
 	}
 	for _, flag := range []string{"--help", "--version"} {
 		stdout.Reset()
 		stderr.Reset()
-		if code = Run(t.Context(), []string{flag}, nil, &stdout, &stderr); code != 0 || stderr.Len() != 0 || stdout.Len() == 0 {
+		if code = Run(t.Context(), Invocation{Args: []string{flag}, Stdout: &stdout, Stderr: &stderr}); code != 0 || stderr.Len() != 0 || stdout.Len() == 0 {
 			t.Fatalf("%s: code=%d stdout=%q stderr=%q", flag, code, stdout.String(), stderr.String())
 		}
 	}
@@ -163,21 +164,23 @@ func TestPrivateTransportPreservesPublicAndSumDBRequests(t *testing.T) {
 func TestPrivateAvailabilityPreservesPublicCombinedSource(t *testing.T) {
 	commit := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.UTC)
 	cached := commit.Add(24 * time.Hour)
+	privateModule := module.Version{Path: "private.example/repo", Version: "v1.0.0"}
+	publicModule := module.Version{Path: "public.example/repo", Version: "v1.0.0"}
 	source := privateAvailability{
 		patterns: "private.example/*",
 		public: availability.CombinedSource{Recent: map[string]time.Time{
-			availability.Key("private.example/repo", "v1.0.0"): cached,
-			availability.Key("public.example/repo", "v1.0.0"):  cached,
+			availability.Key(privateModule): cached,
+			availability.Key(publicModule):  cached,
 		}},
 	}
-	private, err := source.AvailableAt(t.Context(), "private.example/repo", "v1.0.0", commit)
+	private, err := source.AvailableAt(availability.Query{Module: privateModule, CommitTime: commit})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !private.CommitTime.Equal(commit) || !private.AvailableAt.Equal(commit) || private.FirstCached != nil {
 		t.Fatalf("private availability=%+v, want only commit time %s", private, commit)
 	}
-	public, err := source.AvailableAt(t.Context(), "public.example/repo", "v1.0.0", commit)
+	public, err := source.AvailableAt(availability.Query{Module: publicModule, CommitTime: commit})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -303,10 +306,10 @@ func TestPrivateAccessCloseRemovesNestedCache(t *testing.T) {
 	}
 }
 
-type privateTestSource func(context.Context, string, string, time.Time) (availability.Availability, error)
+type privateTestSource func(availability.Query) (availability.Availability, error)
 
-func (f privateTestSource) AvailableAt(ctx context.Context, path, version string, commit time.Time) (availability.Availability, error) {
-	return f(ctx, path, version, commit)
+func (f privateTestSource) AvailableAt(query availability.Query) (availability.Availability, error) {
+	return f(query)
 }
 
 func TestPrivateAvailabilityPropagatesPublicFailureOnly(t *testing.T) {
@@ -314,15 +317,17 @@ func TestPrivateAvailabilityPropagatesPublicFailureOnly(t *testing.T) {
 	publicCalls := 0
 	source := privateAvailability{
 		patterns: "private.example/*",
-		public: privateTestSource(func(context.Context, string, string, time.Time) (availability.Availability, error) {
+		public: privateTestSource(func(availability.Query) (availability.Availability, error) {
 			publicCalls++
 			return availability.Availability{}, wantErr
 		}),
 	}
-	if _, err := source.AvailableAt(t.Context(), "private.example/repo", "v1.0.0", time.Now()); err != nil || publicCalls != 0 {
+	privateQuery := availability.Query{Module: module.Version{Path: "private.example/repo", Version: "v1.0.0"}, CommitTime: time.Now()}
+	if _, err := source.AvailableAt(privateQuery); err != nil || publicCalls != 0 {
 		t.Fatalf("private lookup error=%v public calls=%d", err, publicCalls)
 	}
-	if _, err := source.AvailableAt(t.Context(), "public.example/repo", "v1.0.0", time.Now()); !errors.Is(err, wantErr) || publicCalls != 1 {
+	publicQuery := availability.Query{Module: module.Version{Path: "public.example/repo", Version: "v1.0.0"}, CommitTime: time.Now()}
+	if _, err := source.AvailableAt(publicQuery); !errors.Is(err, wantErr) || publicCalls != 1 {
 		t.Fatalf("public lookup error=%v public calls=%d", err, publicCalls)
 	}
 }

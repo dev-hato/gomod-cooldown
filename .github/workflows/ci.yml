@@ -5,13 +5,14 @@ on:
       - main
   pull_request:
   merge_group:
-permissions:
-  contents: read
+permissions: {}
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 jobs:
   go-versions:
+    permissions:
+      contents: read
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
@@ -45,6 +46,8 @@ jobs:
 
           echo "versions=${versions}" >> "$GITHUB_OUTPUT"
   unit:
+    permissions:
+      contents: read
     name: unit (Go ${{ matrix.go-version }})
     needs: go-versions
     runs-on: ubuntu-latest
@@ -60,11 +63,13 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: ${{ matrix.go-version }}
-      - uses: flatt-security/setup-takumi-guard-golang@37631ecffa6faf06754444a4807451b7a55c64b5 # v1.2.0
+      - uses: flatt-security/setup-takumi-guard-golang@02545d3425218766aac4dca114dcc3f6eaa0df4a # v1.3.0
       - run: go version
       - run: go test ./...
       - run: go vet ./...
   race:
+    permissions:
+      contents: read
     name: race
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -75,9 +80,11 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
-      - uses: flatt-security/setup-takumi-guard-golang@37631ecffa6faf06754444a4807451b7a55c64b5 # v1.2.0
+      - uses: flatt-security/setup-takumi-guard-golang@02545d3425218766aac4dca114dcc3f6eaa0df4a # v1.3.0
       - run: go test -race ./...
   platform:
+    permissions:
+      contents: read
     name: build/smoke (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     timeout-minutes: 15
@@ -95,7 +102,7 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
-      - uses: flatt-security/setup-takumi-guard-golang@37631ecffa6faf06754444a4807451b7a55c64b5 # v1.2.0
+      - uses: flatt-security/setup-takumi-guard-golang@02545d3425218766aac4dca114dcc3f6eaa0df4a # v1.3.0
       - name: Run tests on the target OS
         run: go test ./...
       - name: Build and smoke-test the CLI
@@ -113,6 +120,8 @@ jobs:
           go version -m "${binary}" | tee build-info.txt
           grep -F "github.com/dev-hato/gomod-cooldown/cmd/gomod-cooldown" build-info.txt
   vulnerability:
+    permissions:
+      contents: read
     name: govulncheck
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -123,7 +132,7 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
-      - uses: flatt-security/setup-takumi-guard-golang@37631ecffa6faf06754444a4807451b7a55c64b5 # v1.2.0
+      - uses: flatt-security/setup-takumi-guard-golang@02545d3425218766aac4dca114dcc3f6eaa0df4a # v1.3.0
       - run: go tool golang.org/x/vuln/cmd/govulncheck ./...
   # Keep this stable check name: the main branch ruleset requires "test".
   test:
@@ -158,6 +167,8 @@ jobs:
           done
   # Keep this stable check name: the main branch ruleset requires "lint".
   lint:
+    permissions:
+      contents: read
     name: lint
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -168,7 +179,7 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
-      - uses: flatt-security/setup-takumi-guard-golang@37631ecffa6faf06754444a4807451b7a55c64b5 # v1.2.0
+      - uses: flatt-security/setup-takumi-guard-golang@02545d3425218766aac4dca114dcc3f6eaa0df4a # v1.3.0
       - uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
         with:
           version-file: .tool-versions

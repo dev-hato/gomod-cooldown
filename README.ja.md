@@ -15,7 +15,7 @@ Go projectまたはGoogleと提携・承認・スポンサー関係はありま�
 
 ## インストール
 
-`gomod-cooldown` のbuildとinstallにはGo 1.26.6以降が必要です。
+`gomod-cooldown` のbuildとinstallにはGo 1.26.10以降が必要です。
 commandをラップして実行する場合も、`PATH` 上に `go` が必要です。helpとversionの表示には
 不要です。
 
@@ -227,18 +227,18 @@ pseudo-versionのversion-specific endpointは引き続きダウンロードで�
 
 ## 開発
 
-最低対応toolchainはGo 1.26.6です。CIではGo 1.26.6でcore testを
+最低対応toolchainはGo 1.26.10です。CIではGo 1.26.10でcore testを
 実行し、Linux、macOS、WindowsでCLIのtest、build、smoke testを行います。ローカルでの
 全確認手順とcontribution processは [CONTRIBUTING.md](CONTRIBUTING.md) を参照してください。
 
 ```sh
-gofmt -w cmd internal
+go fix ./...
+golangci-lint fmt
 go mod tidy
 go test ./...
 go vet ./...
 go test -race ./...
 golangci-lint run
-golangci-lint fmt
 ```
 
 テストは `httptest.Server`、inject可能なHTTP clientとclockを使うため、外部networkに
@@ -248,7 +248,8 @@ golangci-lint fmt
 [`internal/cli/testdata/large-modules`](internal/cli/testdata/large-modules) に記録しています。
 GitHub Actionsはtest、race検出、vetを実行します。さらに、`govulncheck`、version固定
 した`golangci-lint`、cross-platform build smoke testも実行します。リポジトリ内のPRでは別workflowが
-`gofmt`/`goimports`を実行し、安全な差分があれば整形用PRを作成・更新します。
+`go fix ./...`、`golangci-lint fmt`（`gofmt`/`goimports`）の順に実行し、
+差分があれば`actions-diff-pr-management`で修正・整形用PRを作成・更新します。
 
 ## 互換性
 

@@ -100,7 +100,7 @@ func TestTerminalInterruptHelper(t *testing.T) {
 	}
 	signals := make(chan os.Signal, 4)
 	signal.Notify(signals, syscall.SIGINT)
-	foreground, err := terminalForegroundGroup(os.Stdin.Fd())
+	foreground, err := terminalFD(os.Stdin.Fd()).foregroundGroup()
 	if err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, "get interrupt helper foreground group: %v\n", err)
 		os.Exit(100)
@@ -205,7 +205,7 @@ func TestForegroundRestoreHelper(t *testing.T) {
 		return
 	}
 	wrapperExit := runWrapperForRestoreHelper()
-	foreground, err := terminalForegroundGroup(os.Stdin.Fd())
+	foreground, err := terminalFD(os.Stdin.Fd()).foregroundGroup()
 	if err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, "get restored foreground group: %v\n", err)
 		os.Exit(101)

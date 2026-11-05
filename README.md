@@ -15,7 +15,7 @@ It is not affiliated with, endorsed by, or sponsored by the Go project or Google
 
 ## Installation
 
-Go 1.26.6 or later is required to build or install `gomod-cooldown`.
+Go 1.26.10 or later is required to build or install `gomod-cooldown`.
 Running a wrapped command also requires `go` on `PATH`; help and version output
 do not.
 
@@ -251,20 +251,20 @@ version-specific endpoints.
 
 ## Development
 
-The minimum supported toolchain is Go 1.26.6. CI runs the core test suite on
-Go 1.26.6, and tests, builds, and smoke-tests the CLI on Linux, macOS, and
+The minimum supported toolchain is Go 1.26.10. CI runs the core test suite on
+Go 1.26.10, and tests, builds, and smoke-tests the CLI on Linux, macOS, and
 Windows. See
 [CONTRIBUTING.md](CONTRIBUTING.md) for the full local verification and
 contribution process.
 
 ```sh
-gofmt -w cmd internal
+go fix ./...
+golangci-lint fmt
 go mod tidy
 go test ./...
 go vet ./...
 go test -race ./...
 golangci-lint run
-golangci-lint fmt
 ```
 
 Tests use `httptest.Server`, injected clients/clocks, and no external network.
@@ -274,8 +274,9 @@ Helm, and Caddy. Fixture provenance is recorded in
 [`internal/cli/testdata/large-modules`](internal/cli/testdata/large-modules).
 GitHub Actions runs tests, race detection, and vet. It also runs
 `govulncheck`, pinned `golangci-lint`, and cross-platform build smoke tests.
-For an in-repository pull request, a separate workflow runs `gofmt`/`goimports`
-and opens or updates a formatting pull request when safe changes are available.
+For an in-repository pull request, a separate workflow runs `go fix ./...`, then
+`golangci-lint fmt` (`gofmt`/`goimports`), and opens or updates a pull request with
+the resulting fixes and formatting changes using `actions-diff-pr-management`.
 
 ## Compatibility
 

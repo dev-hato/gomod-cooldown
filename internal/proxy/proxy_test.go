@@ -9,12 +9,14 @@ import (
 	"log"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/dev-hato/gomod-cooldown/internal/availability"
+	"golang.org/x/mod/module"
 )
 
 var now = time.Date(2026, 7, 11, 12, 0, 0, 0, time.UTC)
@@ -41,7 +43,7 @@ func TestListFiltersAvailabilityAndOrder(t *testing.T) {
 	defer up.Close()
 	firstNew := now.Add(-2 * time.Hour)
 	s := newTestServer(t, up.URL, availability.CombinedSource{Recent: map[string]time.Time{
-		availability.Key("example.com/m", "v1.1.0"): firstNew,
+		availability.Key(module.Version{Path: "example.com/m", Version: "v1.1.0"}): firstNew,
 	}})
 	r := httptest.NewRecorder()
 	s.ServeHTTP(r, httptest.NewRequest(http.MethodGet, "/example.com/m/@v/list", nil))
@@ -760,7 +762,7 @@ func TestInfoCacheWaiterRetriesAfterLeaderCancellation(t *testing.T) {
 	defer cancelLeader()
 	leaderDone := make(chan error, 1)
 	go func() {
-		_, err := s.info(leaderCtx, "example.com/m", "v1.0.0")
+		_, err := s.info(leaderCtx, module.Version{Path: "example.com/m", Version: "v1.0.0"})
 		leaderDone <- err
 	}()
 	receiveWithin(t, firstStarted, "leader request")
@@ -768,7 +770,7 @@ func TestInfoCacheWaiterRetriesAfterLeaderCancellation(t *testing.T) {
 	waiterCtx := &doneObservingContext{Context: context.Background(), observed: make(chan struct{})}
 	waiterDone := make(chan infoResult, 1)
 	go func() {
-		got, err := s.info(waiterCtx, "example.com/m", "v1.0.0")
+		got, err := s.info(waiterCtx, module.Version{Path: "example.com/m", Version: "v1.0.0"})
 		waiterDone <- infoResult{info: got, err: err}
 	}()
 	receiveWithin(t, waiterCtx.observed, "waiter join")
@@ -804,7 +806,7 @@ func TestInfoCacheCanceledWaiterDoesNotCancelLeader(t *testing.T) {
 
 	leaderDone := make(chan error, 1)
 	go func() {
-		_, err := s.info(context.Background(), "example.com/m", "v1.0.0")
+		_, err := s.info(context.Background(), module.Version{Path: "example.com/m", Version: "v1.0.0"})
 		leaderDone <- err
 	}()
 	receiveWithin(t, firstStarted, "leader request")
@@ -814,7 +816,7 @@ func TestInfoCacheCanceledWaiterDoesNotCancelLeader(t *testing.T) {
 	waiterCtx := &doneObservingContext{Context: waiterBase, observed: make(chan struct{})}
 	waiterDone := make(chan error, 1)
 	go func() {
-		_, err := s.info(waiterCtx, "example.com/m", "v1.0.0")
+		_, err := s.info(waiterCtx, module.Version{Path: "example.com/m", Version: "v1.0.0"})
 		waiterDone <- err
 	}()
 	receiveWithin(t, waiterCtx.observed, "waiter join")
@@ -827,7 +829,7 @@ func TestInfoCacheCanceledWaiterDoesNotCancelLeader(t *testing.T) {
 	if err := receiveWithin(t, leaderDone, "leader request"); err != nil {
 		t.Fatalf("leader error=%v", err)
 	}
-	if _, err := s.info(context.Background(), "example.com/m", "v1.0.0"); err != nil {
+	if _, err := s.info(context.Background(), module.Version{Path: "example.com/m", Version: "v1.0.0"}); err != nil {
 		t.Fatal(err)
 	}
 	if infoCalls.Load() != 1 {
@@ -877,7 +879,7 @@ func requireOKStatuses(t *testing.T, statuses <-chan int, count int) {
 
 type callsSource struct{ n atomic.Int32 }
 
-func (s *callsSource) AvailableAt(context.Context, string, string, time.Time) (availability.Availability, error) {
+func (s *callsSource) AvailableAt(availability.Query) (availability.Availability, error) {
 	s.n.Add(1)
 	return availability.Availability{}, nil
 }
@@ -902,4 +904,60 @@ func fakeProxy(t *testing.T, data map[string]string) *httptest.Server {
 }
 func info(v string, tm time.Time) string {
 	return fmt.Sprintf(`{"Version":%q,"Time":%q}`, v, tm.Format(time.RFC3339))
+}
+
+func TestRejectsDotSegmentsInRequestPath(t *testing.T) {
+	var upstreamCalls atomic.Int32
+
+	up := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		upstreamCalls.Add(1)
+		if _, err := io.WriteString(w, "secret"); err != nil {
+			t.Fatal(err)
+		}
+	}))
+	defer up.Close()
+
+	s := newTestServer(t, up.URL+"/prefix", availability.CommitTimeSource{})
+
+	for _, target := range []string{
+		"/example.com/m/../../admin/@v/v1.0.0.info",
+		"/%2e%2e/admin/@v/list",
+		"/example.com/./m/@latest",
+		"/example.com/m/@v/..",
+	} {
+		r := httptest.NewRecorder()
+		s.ServeHTTP(r, httptest.NewRequest(http.MethodGet, target, nil))
+		if r.Code != http.StatusBadRequest {
+			t.Fatalf("%s: status=%d body=%q", target, r.Code, r.Body.String())
+		}
+	}
+
+	if upstreamCalls.Load() != 0 {
+		t.Fatalf("upstream calls = %d", upstreamCalls.Load())
+	}
+}
+
+func TestOversizedUpstreamResponseFailsClosed(t *testing.T) {
+	oversized := strings.Repeat("v", maxUpstreamBody+1)
+	path := "/example.com/m/@v/list"
+
+	for name, data := range map[string]map[string]string{
+		"list": {path: oversized},
+		"info": {path: "v1.0.0\n", "/example.com/m/@v/v1.0.0.info": oversized},
+	} {
+		t.Run(name, func(t *testing.T) {
+			up := fakeProxy(t, data)
+			defer up.Close()
+
+			r := httptest.NewRecorder()
+			newTestServer(t, up.URL, availability.CommitTimeSource{}).ServeHTTP(
+				r,
+				httptest.NewRequest(http.MethodGet, path, nil),
+			)
+
+			if r.Code != http.StatusBadGateway || !strings.Contains(r.Body.String(), "exceeds") {
+				t.Fatalf("status=%d body=%.200q", r.Code, r.Body.String())
+			}
+		})
+	}
 }

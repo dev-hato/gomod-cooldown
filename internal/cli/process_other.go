@@ -3,10 +3,9 @@
 package cli
 
 import (
-	"io"
 	"os/exec"
 )
 
-func prepareChildProcess(_ *exec.Cmd, _ io.Reader) (func(), bool) {
-	return func() {}, false
+func (Invocation) prepareChildProcess(*exec.Cmd) preparedChild {
+	return preparedChild{restoreForeground: func() {}}
 }

@@ -79,17 +79,17 @@ func TestPrivateFilteringCannotBeDisabled(t *testing.T) {
 		t.Run(option, func(t *testing.T) {
 			args := []string{option, "--", "must-not-run"}
 			var stdout, stderr lockedBuffer
-			if _, err := Parse(args, &stderr); err == nil {
+			if _, err := Parse(args); err == nil {
 				t.Fatalf("Parse accepted removed option %q", option)
 			}
-			code := Run(context.Background(), args, nil, &stdout, &stderr)
+			code := Run(context.Background(), Invocation{Args: args, Stdout: &stdout, Stderr: &stderr})
 			if code != 2 || !strings.Contains(stderr.String(), "flag provided but not defined: -include-private") {
 				t.Fatalf("Run(%q) exit=%d stderr=%s, want unknown-flag usage error", option, code, stderr.String())
 			}
 		})
 	}
 	var stdout, stderr lockedBuffer
-	if code := Run(context.Background(), []string{"--help"}, nil, &stdout, &stderr); code != 0 {
+	if code := Run(context.Background(), Invocation{Args: []string{"--help"}, Stdout: &stdout, Stderr: &stderr}); code != 0 {
 		t.Fatalf("help exit=%d stderr=%s", code, stderr.String())
 	}
 	if strings.Contains(stdout.String(), "include-private") {
@@ -137,21 +137,7 @@ func configurePrivateIntegrationGo(t *testing.T) {
 	if err != nil {
 		t.Skip("git is required for private-module integration tests")
 	}
-	var root string
-	if runtime.GOOS == "windows" {
-		// Git's VCS cache appends a hash and hook filenames below this directory.
-		root, err = os.MkdirTemp("", "gmc-test-")
-		if err != nil {
-			t.Fatal(err)
-		}
-		t.Cleanup(func() {
-			if err := os.RemoveAll(root); err != nil {
-				t.Errorf("remove private integration workspace: %v", err)
-			}
-		})
-	} else {
-		root = t.TempDir()
-	}
+	root := privateIntegrationTempDir(t)
 	// Keep each invocation's private fetch workspace observable after Run exits.
 	for _, key := range []string{"TMPDIR", "TMP", "TEMP"} {
 		t.Setenv(key, root)
@@ -211,6 +197,24 @@ func configurePrivateIntegrationGo(t *testing.T) {
 	runGit(now, "config", "--global", "url."+privateIntegrationFileURL(repo)+".insteadOf", "https://"+privateIntegrationModulePath)
 }
 
+func privateIntegrationTempDir(t *testing.T) string {
+	t.Helper()
+	if runtime.GOOS != "windows" {
+		return t.TempDir()
+	}
+	//nolint:usetesting // The test name in t.TempDir can push Git's VCS cache over the Windows path limit.
+	dir, err := os.MkdirTemp("", "gmc-test-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := os.RemoveAll(dir); err != nil {
+			t.Errorf("remove private integration workspace: %v", err)
+		}
+	})
+	return dir
+}
+
 func privateIntegrationFileURL(repo string) string {
 	repoPath := filepath.ToSlash(repo)
 	if !strings.HasPrefix(repoPath, "/") {
@@ -231,7 +235,7 @@ func runPrivateGoThroughCooldown(t *testing.T, upstream, dir string, goArgs ...s
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 	var stdout, stderr lockedBuffer
-	code := Run(ctx, args, nil, &stdout, &stderr)
+	code := Run(ctx, Invocation{Args: args, Stdout: &stdout, Stderr: &stderr})
 	leftovers, err := filepath.Glob(filepath.Join(os.TempDir(), "gomod-cooldown-private-*"))
 	if err != nil {
 		t.Fatal(err)

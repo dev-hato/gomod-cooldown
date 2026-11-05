@@ -34,40 +34,45 @@ jobs:
         if: github.event.action != 'closed'
         with:
           go-version-file: go.mod
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         if: github.event.action != 'closed'
         with:
           node-version-file: package.json
           cache: npm
-      - uses: flatt-security/setup-takumi-guard-golang@37631ecffa6faf06754444a4807451b7a55c64b5 # v1.2.0
+      - uses: flatt-security/setup-takumi-guard-golang@02545d3425218766aac4dca114dcc3f6eaa0df4a # v1.3.0
         if: github.event.action != 'closed'
-      - uses: flatt-security/setup-takumi-guard-npm@6d4182745c1e474c35a023573c2612c085be45a4 # v1.2.0
+      - uses: flatt-security/setup-takumi-guard-npm@14f07d0cbc739b42a1b7c70a04c2b84cd1318ddd # v1.4.0
         if: github.event.action != 'closed'
       - uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
         if: github.event.action != 'closed'
         with:
           version-file: .tool-versions
           install-only: true
+      - run: go fix ./...
+        if: github.event.action != 'closed'
       - run: golangci-lint fmt
         if: github.event.action != 'closed'
-      - name: Update README
+      - name: Update README and CONTRIBUTING
         if: github.event.action != 'closed'
         env:
           GO_VERSION: ${{ steps.setup-go.outputs.go-version }}
         run: |
-          for name in README README.ja
+          for name in README README.ja CONTRIBUTING
           do
             envsubst '$GO_VERSION' < "$name.template.md" > "$name.md"
           done
-      - run: npm install
+      # This job has write permissions, so don't run dependency install scripts.
+      - run: npm install --ignore-scripts
         if: github.event.action != 'closed'
+      - if: github.event.action != 'closed'
+        run: npx --no-install rulesync generate
       - run: npx prettier --write .
         if: github.event.action != 'closed'
-      - uses: dev-hato/actions-diff-pr-management@571be0d9572aaf77cdd315c12d6e73a1112910d7 # v2.2.6
+      - uses: dev-hato/actions-diff-pr-management@a3c6f1d6cb3f46d2f48ac3856ef603ef2e508061 # v2.4.0
         if: success() || failure()
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           branch-name-prefix: chore/format
-          pr-title-prefix: "chore: apply formatting and sync README"
-          pr-description-prefix: "Automated formatting changes produced by golangci-lint fmt, prettier, and README/README.ja regenerated from their templates."
+          pr-title-prefix: "chore: apply Go fixes, formatting, and sync README and CONTRIBUTING"
+          pr-description-prefix: "Automated changes produced by go fix, golangci-lint fmt, rulesync, prettier, and README/README.ja/CONTRIBUTING regenerated from their templates."
           exit-failure: false

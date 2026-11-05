@@ -576,7 +576,7 @@ func runGoThroughCooldown(t *testing.T, upstream, dir string, goArgs ...string) 
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 	var stdout, stderr lockedBuffer
-	code := Run(ctx, args, nil, &stdout, &stderr)
+	code := Run(ctx, Invocation{Args: args, Stdin: nil, Stdout: &stdout, Stderr: &stderr})
 	return code, stdout.String(), stderr.String()
 }
 

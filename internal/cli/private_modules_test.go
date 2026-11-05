@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strings"
 	"testing"
@@ -136,7 +137,21 @@ func configurePrivateIntegrationGo(t *testing.T) {
 	if err != nil {
 		t.Skip("git is required for private-module integration tests")
 	}
-	root := t.TempDir()
+	var root string
+	if runtime.GOOS == "windows" {
+		// Git's VCS cache appends a hash and hook filenames below this directory.
+		root, err = os.MkdirTemp("", "gmc-test-")
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() {
+			if err := os.RemoveAll(root); err != nil {
+				t.Errorf("remove private integration workspace: %v", err)
+			}
+		})
+	} else {
+		root = t.TempDir()
+	}
 	// Keep each invocation's private fetch workspace observable after Run exits.
 	for _, key := range []string{"TMPDIR", "TMP", "TEMP"} {
 		t.Setenv(key, root)

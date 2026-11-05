@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strings"
 	"time"
@@ -17,6 +18,8 @@ import (
 	"github.com/dev-hato/gomod-cooldown/internal/privateproxy"
 	"golang.org/x/mod/module"
 )
+
+const goSettingOff = "off"
 
 type privateAccess struct {
 	patterns  string
@@ -56,10 +59,10 @@ func newPrivateAccess(ctx context.Context, opts Options, env []string) (*private
 	if err = os.WriteFile(filepath.Join(dir, "go.mod"), []byte("module gomod-cooldown.invalid/private-fetch\n\ngo 1.18\n"), 0o600); err != nil {
 		return nil, fmt.Errorf("initialize private module workspace: %w", err)
 	}
-	backendEnv := withEnvironment(env, map[string]string{
-		"GO111MODULE": "on", "GOFLAGS": "-modcacherw", "GOWORK": "off", "GOTOOLCHAIN": "local",
-		"GOPROXY": "direct", "GOSUMDB": "off", "GOMODCACHE": filepath.Join(dir, "modcache"),
-	})
+	backendEnv, err := privateBackendEnvironment(env, dir)
+	if err != nil {
+		return nil, err
+	}
 	settings, err := privateGoSettings(ctx, goExecutable, dir, backendEnv, opts.UpstreamTimeout)
 	if err != nil {
 		return nil, err
@@ -81,6 +84,48 @@ func newPrivateAccess(ctx context.Context, opts Options, env []string) (*private
 	}
 	ready = true
 	return p, nil
+}
+
+func privateBackendEnvironment(env []string, dir string) ([]string, error) {
+	overrides := map[string]string{
+		"GO111MODULE": "on", "GOFLAGS": "-modcacherw", "GOWORK": goSettingOff, "GOTOOLCHAIN": "local",
+		"GOPROXY": "direct", "GOSUMDB": goSettingOff, "GOMODCACHE": filepath.Join(dir, "modcache"),
+	}
+	// Resolve GOENV before the settings probe and VCS commands change directories.
+	// Like os/exec, use the last assignment and match names case-insensitively on Windows.
+	for _, entry := range slices.Backward(env) {
+		key, value, found := strings.Cut(entry, "=")
+		isGoEnv := key == "GOENV" || (runtime.GOOS == "windows" && strings.EqualFold(key, "GOENV"))
+		if !found || !isGoEnv {
+			continue
+		}
+		if value != "" && value != goSettingOff && !filepath.IsAbs(value) {
+			path, err := resolveCallerGoEnv(value)
+			if err != nil {
+				return nil, err
+			}
+			overrides["GOENV"] = path
+		}
+		break
+	}
+	return withEnvironment(env, overrides), nil
+}
+
+func resolveCallerGoEnv(path string) (string, error) {
+	if runtime.GOOS == "windows" {
+		absolute, err := filepath.Abs(path)
+		if err != nil {
+			return "", fmt.Errorf("resolve relative GOENV: %w", err)
+		}
+		return absolute, nil
+	}
+	cwd, err := os.Getwd()
+	if err != nil {
+		return "", fmt.Errorf("resolve relative GOENV: %w", err)
+	}
+	// Preserve path components so the filesystem resolves symlinks before "..".
+	separator := string(filepath.Separator)
+	return strings.TrimSuffix(cwd, separator) + separator + path, nil
 }
 
 type goPrivateSettings struct {

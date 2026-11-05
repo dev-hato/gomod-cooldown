@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strings"
 	"testing"
@@ -303,6 +304,31 @@ func TestPrivateAccessCloseRemovesNestedCache(t *testing.T) {
 	}
 	if err := access.close(); err != nil {
 		t.Fatalf("closing removed workspace: %v", err)
+	}
+}
+
+func TestResolveCallerGoEnvPreservesSymlinkParent(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Windows normalizes parent segments before traversing symlinks")
+	}
+	dir := t.TempDir()
+	realDir := filepath.Join(dir, "real", "sub")
+	if err := os.MkdirAll(realDir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(realDir, filepath.Join(dir, "link")); err != nil {
+		t.Fatal(err)
+	}
+	const settings = "GOPRIVATE=private.example/*\n"
+	writeFile(t, filepath.Join(dir, "real", "go.env"), []byte(settings))
+	t.Chdir(dir)
+	path, err := resolveCallerGoEnv("link/../go.env")
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := os.ReadFile(path)
+	if err != nil || string(got) != settings {
+		t.Fatalf("read GOENV through symlink: contents=%q, err=%v", got, err)
 	}
 }
 

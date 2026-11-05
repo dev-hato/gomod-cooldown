@@ -17,7 +17,7 @@ import (
 const privateIntegrationModulePath = "github.com/Goryudyuma/private-test"
 
 func TestGoCommandFiltersPrivateModulesByDefault(t *testing.T) {
-	for _, settings := range []string{"GOPRIVATE", "GONOPROXY", "GOENV", "GONOPROXY none"} {
+	for _, settings := range []string{"GOPRIVATE", "GONOPROXY", "GOENV", "relative GOENV", "GONOPROXY none"} {
 		t.Run(settings, func(t *testing.T) {
 			configurePrivateIntegrationGo(t)
 			switch settings {
@@ -42,11 +42,16 @@ func TestGoCommandFiltersPrivateModulesByDefault(t *testing.T) {
 				importPath += "/subpkg/nested"
 			}
 			dir := writeIntegrationModuleFor(t, privateIntegrationModulePath, "v1.0.0", importPath)
+			if settings == "relative GOENV" {
+				writeFile(t, filepath.Join(dir, "go.env"), []byte("GOPRIVATE=github.com/Goryudyuma/*\n"))
+				t.Chdir(dir)
+				t.Setenv("GOENV", "go.env")
+			}
 
 			code, stdout, stderr := runPrivateGoThroughCooldown(t, p.server.URL, dir,
 				"list", "-m", "-versions", privateIntegrationModulePath)
 			if code != 0 {
-				t.Fatalf("list exit=%d stderr=%s", code, stderr)
+				t.Fatalf("list exit=%d stderr=%s upstream requests=%v", code, stderr, p.allRequests())
 			}
 			want := []string{privateIntegrationModulePath, "v1.0.0", "v1.1.0"}
 			if got := strings.Fields(stdout); !slices.Equal(got, want) {

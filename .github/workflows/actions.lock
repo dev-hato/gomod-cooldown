@@ -24,7 +24,7 @@ workflows:
         - 'golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a'
     '.github/workflows/github-actions-cache-cleaner.yml':
         - 'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1'
-        - 'dev-hato/github-actions-cache-cleaner@24e304c3f342321ddf107e2a97f091600249bd32'
+        - 'dev-hato/github-actions-cache-cleaner@88d68a261462dd5f6f6632adec3fa5cf5466c865'
     '.github/workflows/release.yml':
         - 'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1'
         - 'actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e'
@@ -82,9 +82,9 @@ dependencies:
         repo_id: 350720117
         uses:
             - 'actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3'
-    'dev-hato/github-actions-cache-cleaner@24e304c3f342321ddf107e2a97f091600249bd32':
-        ref: 'v0.0.96'
-        commit: 'sha1-24e304c3f342321ddf107e2a97f091600249bd32'
+    'dev-hato/github-actions-cache-cleaner@88d68a261462dd5f6f6632adec3fa5cf5466c865':
+        ref: 'v0.0.97'
+        commit: 'sha1-88d68a261462dd5f6f6632adec3fa5cf5466c865'
         owner_id: 68012105
         repo_id: 575637822
         uses:

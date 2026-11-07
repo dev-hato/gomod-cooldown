@@ -32,8 +32,10 @@ provided through the private advisory while work is in progress.
 ## Scope notes
 
 `gomod-cooldown` is a dependency-update workflow aid, not a security boundary.
-Exact or already-pinned module versions remain downloadable, and standard Go
-settings such as `GOPRIVATE` and `GONOPROXY` can bypass its temporary proxy.
+Exact or already-pinned module versions remain downloadable, and Go's existing
+module cache may satisfy requests without consulting the temporary proxy.
+Discovery requests for modules matching `GOPRIVATE` or `GONOPROXY` are always
+filtered through the temporary proxy.
 Behavior that matches these documented limitations is generally not a
 vulnerability, but reports showing an undocumented bypass or unsafe network
 exposure are welcome.

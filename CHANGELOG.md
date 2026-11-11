@@ -22,6 +22,7 @@ project follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Honor relative `GOENV` paths when routing private modules.
 - Forward process signals and preserve meaningful child-process exit behavior.
 - Parse fractional day durations consistently with `d` defined as exactly 24
   hours.

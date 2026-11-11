@@ -48,10 +48,10 @@ type upstreamDeps struct {
 	clock  func() time.Time
 }
 
-// childCommand is the argv to run and the proxy URL to run it against.
+// childCommand is the argv and environment of the command to run.
 type childCommand struct {
-	command  []string
-	proxyURL string
+	command []string
+	env     []string
 }
 
 // childProcess is a started child, plus whether it owns its own process group.
@@ -214,7 +214,7 @@ func newFlags() *flagValues {
 	fs.Var((*cooldownValue)(&values.cooldown), "cooldown", "minimum availability age; accepts Go duration strings plus a 'd' day suffix (e.g. 14d, 168h, 1.5d)")
 	fs.StringVar(&values.upstream, "upstream", "https://proxy.golang.org", "upstream GOPROXY URL")
 	fs.Var((*timeSourceValue)(&values.timeSource), "time-source", "availability source: commit or combined")
-	fs.Var((*upstreamTimeoutValue)(&values.timeout), "upstream-timeout", "upstream HTTP timeout")
+	fs.Var((*upstreamTimeoutValue)(&values.timeout), "upstream-timeout", "upstream HTTP and private Go command timeout")
 	fs.BoolVar(&values.verbose, "verbose", false, "log upstream requests and decisions")
 	fs.BoolVar(&values.help, "help", false, "show this help and exit")
 	fs.BoolVar(&values.help, "h", false, "show this help and exit")
@@ -401,6 +401,8 @@ func (e *childStartError) Error() string {
 func (e *childStartError) Unwrap() error { return e.err }
 
 func (inv Invocation) run(ctx context.Context, opts Options) error {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 	client := &http.Client{Timeout: opts.UpstreamTimeout}
 	started := time.Now()
 	clock := func() time.Time { return started }
@@ -408,6 +410,17 @@ func (inv Invocation) run(ctx context.Context, opts Options) error {
 	if err != nil {
 		return err
 	}
+	private, err := newPrivateAccess(ctx, opts, os.Environ())
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if cleanupErr := private.close(); cleanupErr != nil {
+			_, _ = fmt.Fprintf(inv.Stderr, "gomod-cooldown: %v\n", cleanupErr)
+		}
+	}()
+	client.Transport = private.transport
+	source = privateAvailability{patterns: private.patterns, public: source}
 	p, err := proxy.New(proxy.Config{
 		Upstream: opts.Upstream,
 		Client:   client,
@@ -424,15 +437,24 @@ func (inv Invocation) run(ctx context.Context, opts Options) error {
 	if err != nil {
 		return fmt.Errorf("listen on loopback: %w", err)
 	}
-	srv := &http.Server{Handler: listenerHostOnly(ln.Addr().String(), p), ReadHeaderTimeout: 5 * time.Second}
+	addr := ln.Addr().String()
+	srv := &http.Server{
+		Handler:           listenerHostOnly(addr, p),
+		ReadHeaderTimeout: 5 * time.Second,
+		BaseContext:       func(net.Listener) context.Context { return ctx },
+	}
 	go func() { _ = srv.Serve(ln) }()
 	defer func() {
+		cancel()
 		// Preserve context values while allowing shutdown after command cancellation.
 		shutdownCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
 		defer cancel()
 		_ = srv.Shutdown(shutdownCtx)
 	}()
-	return inv.runChild(ctx, childCommand{command: opts.Command, proxyURL: "http://" + ln.Addr().String()})
+	return inv.runChild(ctx, childCommand{
+		command: opts.Command,
+		env:     environ(private.childEnv).withGOPROXY("http://" + addr),
+	})
 }
 
 // listenerHostOnly rejects requests whose Host is not the loopback listener
@@ -469,7 +491,7 @@ func (inv Invocation) runChild(ctx context.Context, child childCommand) error {
 	//nolint:gosec // The caller explicitly supplies the argv after --; no shell is involved.
 	cmd := exec.CommandContext(ctx, child.command[0], child.command[1:]...)
 	cmd.Stdin, cmd.Stdout, cmd.Stderr = inv.Stdin, inv.Stdout, inv.Stderr
-	cmd.Env = environ(os.Environ()).withGOPROXY(child.proxyURL)
+	cmd.Env = child.env
 	prepared := inv.prepareChildProcess(cmd)
 	defer prepared.restoreForeground()
 	commandNotFound := errors.Is(cmd.Err, exec.ErrNotFound)

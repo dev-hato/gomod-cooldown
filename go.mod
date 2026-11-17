@@ -2,7 +2,7 @@ module github.com/dev-hato/gomod-cooldown
 
 go 1.26.11
 
-require golang.org/x/mod v0.42.0
+require golang.org/x/mod v0.43.0
 
 require (
 	golang.org/x/sync v0.24.0 // indirect

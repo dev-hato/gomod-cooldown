@@ -1,6 +1,6 @@
 module github.com/dev-hato/gomod-cooldown
 
-go 1.27.3
+go 1.27.4
 
 require golang.org/x/mod v0.43.0
 

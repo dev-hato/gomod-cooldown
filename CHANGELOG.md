@@ -17,6 +17,7 @@ project follows [Semantic Versioning](https://semver.org/).
 - Recommend module-root updates with `go get -u -t ./...` followed by
   `go mod tidy`, avoiding `go get -u all` package-graph failures.
 - Pin release-critical lint and vulnerability-analysis tooling in CI.
+- Raise the minimum supported Go toolchain to 1.27.4.
 - License the project under MIT while retaining third-party fixture notices
   and license texts.
 

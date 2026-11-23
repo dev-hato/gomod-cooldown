@@ -1,15 +1,39 @@
 module github.com/dev-hato/gomod-cooldown
 
-go 1.26.11
+go 1.27.4
 
 require golang.org/x/mod v0.43.0
 
 require (
+	github.com/adrg/xdg v0.5.3 // indirect
+	github.com/charmbracelet/x/term v0.2.2 // indirect
+	github.com/danieljoos/wincred v1.2.3 // indirect
+	github.com/github/actions-lockfile/go v0.0.6 // indirect
+	github.com/godbus/dbus/v5 v5.2.2 // indirect
+	github.com/google/go-github/v93 v93.0.0 // indirect
+	github.com/google/go-querystring v1.2.0 // indirect
+	github.com/kr/text v0.2.0 // indirect
+	github.com/lmittmann/tint v1.1.3 // indirect
+	github.com/mattn/go-colorable v0.1.14 // indirect
+	github.com/mattn/go-isatty v0.0.20 // indirect
+	github.com/rogpeppe/go-internal v1.16.0 // indirect
+	github.com/suzuki-shunsuke/ghalint v1.6.0 // indirect
+	github.com/suzuki-shunsuke/go-error-with-exit-code v1.0.0 // indirect
+	github.com/suzuki-shunsuke/slog-error v0.2.2 // indirect
+	github.com/suzuki-shunsuke/slog-util v0.3.2 // indirect
+	github.com/suzuki-shunsuke/urfave-cli-v3-util v0.2.4 // indirect
+	github.com/urfave/cli/v3 v3.14.0 // indirect
+	github.com/zalando/go-keyring v0.2.8 // indirect
+	golang.org/x/oauth2 v0.37.0 // indirect
 	golang.org/x/sync v0.24.0 // indirect
 	golang.org/x/sys v0.49.0 // indirect
 	golang.org/x/telemetry v0.0.0-20261010193011-f71dc92da45e // indirect
 	golang.org/x/tools v0.52.0 // indirect
 	golang.org/x/vuln v1.9.0 // indirect
+	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
-tool golang.org/x/vuln/cmd/govulncheck
+tool (
+	github.com/suzuki-shunsuke/ghalint/cmd/ghalint
+	golang.org/x/vuln/cmd/govulncheck
+)

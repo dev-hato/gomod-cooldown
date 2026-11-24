@@ -13,7 +13,7 @@ workflows:
         - 'golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a'
     '.github/workflows/dependency_review.yml':
         - 'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1'
-        - 'actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294'
+        - 'actions/dependency-review-action@bbc44d14a204704ccc493733616cd1e93a0321ec'
     '.github/workflows/format.yml':
         - 'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1'
         - 'actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5'
@@ -53,9 +53,9 @@ dependencies:
         commit: 'sha1-64ab729a6294000f5aa4a4bc0b73d1f32bc45510'
         owner_id: 44036562
         repo_id: 642580244
-    'actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294':
-        ref: 'v5.0.0'
-        commit: 'sha1-a1d282b36b6f3519aa1f3fc636f609c47dddb294'
+    'actions/dependency-review-action@bbc44d14a204704ccc493733616cd1e93a0321ec':
+        ref: 'v5.0.1'
+        commit: 'sha1-bbc44d14a204704ccc493733616cd1e93a0321ec'
         owner_id: 44036562
         repo_id: 476372928
     'actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3':

@@ -4,7 +4,7 @@
 version: 'v0.0.3'
 workflows:
     '.github/workflows/add-to-task-list.yml':
-        - 'actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510'
+        - 'actions/create-github-app-token@f418cff399f7aef4c2f0ad47e25ca7a6abbdd6fc'
         - 'dev-hato/actions-add-to-projects@3f6870416d1ebf4eae418af990a83780bdd45f1f'
     '.github/workflows/ci.yml':
         - 'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1'
@@ -35,7 +35,7 @@ workflows:
         - 'flatt-security/setup-takumi-guard-golang@02545d3425218766aac4dca114dcc3f6eaa0df4a'
     '.github/workflows/update-actions-lock.yml':
         - 'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1'
-        - 'actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510'
+        - 'actions/create-github-app-token@f418cff399f7aef4c2f0ad47e25ca7a6abbdd6fc'
         - 'dev-hato/actions-diff-pr-management@474e401b8a7df75f1c804a60aa987140c1e0548c'
 dependencies:
     'actions/add-to-project@f2c1f1fa649a891be84948ea89b5dfba1526ef05':
@@ -48,9 +48,9 @@ dependencies:
         commit: 'sha1-3d3c42e5aac5ba805825da76410c181273ba90b1'
         owner_id: 44036562
         repo_id: 197814629
-    'actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510':
-        ref: 'v3.3.0'
-        commit: 'sha1-64ab729a6294000f5aa4a4bc0b73d1f32bc45510'
+    'actions/create-github-app-token@f418cff399f7aef4c2f0ad47e25ca7a6abbdd6fc':
+        ref: 'v3.4.0'
+        commit: 'sha1-f418cff399f7aef4c2f0ad47e25ca7a6abbdd6fc'
         owner_id: 44036562
         repo_id: 642580244
     'actions/dependency-review-action@bbc44d14a204704ccc493733616cd1e93a0321ec':

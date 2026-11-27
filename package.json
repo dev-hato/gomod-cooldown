@@ -1,7 +1,7 @@
 {
   "devDependencies": {
     "prettier": "3.10.1",
-    "rulesync": "43.9.2"
+    "rulesync": "43.10.1"
   },
   "engines": {
     "node": "26.13.1"

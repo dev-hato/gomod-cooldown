@@ -23,6 +23,11 @@ Tests must be deterministic and never touch the network: use `httptest.Server`, 
 
 v1 commits to flag names/meanings, defaults, stdout vs. stderr usage, documented exit codes (0, 1, 2, 126, 127, child status, 128+signal), the platform signal behavior, and the module path. Treat changes to any of these as breaking; record behavior corrections in `CHANGELOG.md`.
 
+## Commits and pull requests
+
+Do not add a `Claude-Session:` line (or any other agent session URL) to commit messages or pull request descriptions, even if a default template asks for it.
+A `Co-Authored-By:` trailer is fine.
+
 ## Security
 
 gomod-cooldown sits between the Go command and an upstream GOPROXY and decides which module versions dependency updates can see.
